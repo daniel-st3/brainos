@@ -45,6 +45,10 @@ export function clearanceIssues(story: Story, draft: Draft): string[] {
 export function approvalIssues(story: Story, draft?: Draft): string[] {
   if (!draft) return ["Choose a draft revision."];
   const issues = clearanceIssues(story, draft);
+  if (story.discovery?.needs_review)
+    issues.push(
+      "Source text changed; check the new evidence and reconfirm research.",
+    );
   if (story.active_draft_id !== draft.id)
     issues.push("Only the active revision can be reviewed.");
   if (
@@ -138,6 +142,13 @@ export async function applyCommand(
       "Published history is locked. Start a follow-up story for corrections.",
     );
   switch (command.type) {
+    case "queue_research":
+      story.priority = true;
+      log(
+        "research_requested",
+        "Saved for human research. Verification gates remain unchanged.",
+      );
+      break;
     case "prioritize":
       story.priority = !story.priority;
       log("priority", story.priority ? "Pinned for today" : "Priority removed");
@@ -233,6 +244,8 @@ export async function applyCommand(
       editable();
       story.research_notes = command.notes;
       story.research_confirmed = command.confirmed;
+      if (command.confirmed && story.discovery)
+        story.discovery.needs_review = false;
       invalidate("Research changed; prior approvals require a new review.");
       if (
         [

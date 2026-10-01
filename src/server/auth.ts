@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { isConnected } from "./repository";
+import { dataMode } from "./mode";
 export async function authClient() {
   const jar = await cookies();
   return createServerClient(
@@ -24,7 +25,10 @@ export async function authClient() {
   );
 }
 export async function editor() {
-  if (!isConnected()) return "Daniel · local demo";
+  if (!isConnected())
+    return dataMode() === "demo"
+      ? "Daniel · local demo"
+      : "Daniel · local research";
   const client = await authClient();
   const {
     data: { user },

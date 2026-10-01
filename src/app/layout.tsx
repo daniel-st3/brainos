@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { dataMode } from "@/server/mode";
 import { Shell } from "@/components/shell";
 import "./globals.css";
 export const metadata: Metadata = {
@@ -18,7 +19,7 @@ export default function RootLayout({
         <a className="skip-link" href="#main-content">
           Skip to content
         </a>
-        <Shell demo={process.env.CONTENT_OS_MODE !== "supabase"}>
+        <Shell demo={dataMode() === "demo"}>
           {children}
         </Shell>
       </body>

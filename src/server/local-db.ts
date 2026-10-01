@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { mkdir, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { createDemoStories } from "../domain/seed";
+import { dataMode } from "./mode";
 export async function initializeDb(dataDir?: string) {
   if (dataDir) await mkdir(dataDir, { recursive: true });
   const db = new PGlite(dataDir);
@@ -49,10 +50,19 @@ export function localDb() {
   globalDb.newsroomDb ??= (async () => {
     const db = await initializeDb(
       process.env.CONTENT_OS_DATA_DIR ??
-        path.join(process.cwd(), ".data/newsroom"),
+        path.join(
+          /* turbopackIgnore: true */
+          process.cwd(),
+          ".data",
+          dataMode() === "demo" ? "newsroom" : "live-newsroom",
+        ),
     );
-    await seedDb(db);
+    if (dataMode() === "demo") await seedDb(db);
     return db;
   })();
   return globalDb.newsroomDb;
+}
+export async function closeLocalDb() {
+  if (globalDb.newsroomDb) await (await globalDb.newsroomDb).close();
+  delete globalDb.newsroomDb;
 }

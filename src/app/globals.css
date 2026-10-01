@@ -1886,3 +1886,7 @@ td:first-child {
     transition: none !important;
   }
 }
+
+.discovery-actions {display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;align-items:flex-start;}
+.brief-card-top {flex-wrap:wrap;}
+.brief-card h2,.source-panel h3 {overflow-wrap:anywhere;}

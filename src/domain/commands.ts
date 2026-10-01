@@ -12,6 +12,7 @@ const safeUrl = z
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("transition"), target: z.enum(statuses) }),
   z.object({ type: z.literal("prioritize") }),
+  z.object({ type: z.literal("queue_research") }),
   z.object({ type: z.literal("archive") }),
   z.object({
     type: z.literal("research"),

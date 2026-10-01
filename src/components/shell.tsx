@@ -95,7 +95,7 @@ export function Shell({
           <div className="topbar-right">
             <span className="edition">ES PRIMARY · BOGOTÁ</span>
             <span className={`mode-badge ${demo ? "" : "live"}`}>
-              {demo ? "DEMO WORKSPACE" : "PRIVATE WORKSPACE"}
+              {demo ? "DEMO WORKSPACE" : "LIVE RESEARCH"}
             </span>
           </div>
         </header>
@@ -105,6 +105,7 @@ export function Shell({
             news, measured results, or external publishing.
           </div>
         )}
+        {!demo && <div className="demo-strip">Live source material · claims remain unverified until human review · no external publishing.</div>}
         <main id="main-content">{children}</main>
         <footer className="footer">
           <span>CONTENT OS / EDITORIAL WORKSPACE</span>

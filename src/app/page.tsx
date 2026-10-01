@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { dataMode } from "@/server/mode";
 import { ArrowUpRight, Newspaper, ShieldCheck, Clock3 } from "lucide-react";
 import { newsroom } from "@/server/data";
 import { PageHeader, Status, StoryTable } from "@/components/ui";
@@ -57,7 +58,9 @@ export default async function Home() {
               <Newspaper size={17} />
               THE MORNING BRIEF
             </span>
-            <span>DEMO EDITION</span>
+            <span>
+              {dataMode() === "demo" ? "DEMO EDITION" : "LIVE DISCOVERY"}
+            </span>
           </div>
           <h2>
             Fewer tabs.
@@ -70,12 +73,16 @@ export default async function Home() {
           </p>
           <div className="brief-spotlight">
             <span className="small-cap">LEAD STORY · AI IN PRACTICE</span>
-            <Link href={`/stories/${stories[0]?.id}`}>
+            <Link href={stories[0] ? `/stories/${stories[0].id}` : "/inbox"}>
               {stories[0]?.title ?? "Your next story starts in the inbox."}
               <ArrowUpRight size={20} />
             </Link>
             <div className="inline-meta">
-              <span>Primary-source fixture</span>
+              <span>
+                {dataMode() === "demo"
+                  ? "Primary-source fixture"
+                  : "Inspect original evidence"}
+              </span>
               <span>Human verification needed</span>
             </div>
           </div>
@@ -101,7 +108,10 @@ export default async function Home() {
                   </span>
                   <span>
                     <Clock3 size={16} />
-                    Revision 2 · ready to inspect
+                    Revision{" "}
+                    {s.drafts.find((d) => d.id === s.active_draft_id)
+                      ?.revision ?? "—"}{" "}
+                    · ready to inspect
                   </span>
                 </div>
                 <Link className="button" href="/review">

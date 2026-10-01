@@ -2,6 +2,8 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import type { Story } from "@/domain/types";
 import { localDb } from "./local-db";
+import { dataMode } from "./mode";
+import { orderSources } from "../ingestion/provenance";
 export const isConnected = () => process.env.CONTENT_OS_MODE === "supabase";
 function supabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -16,13 +18,17 @@ export async function readStories(): Promise<Story[]> {
   if (isConnected()) {
     const { data, error } = await supabase().rpc("read_newsroom");
     if (error) throw new Error(error.message);
-    return data as Story[];
+    return (data as Story[])
+      .filter((s) => s.is_demo === (dataMode() === "demo"))
+      .map(orderSources);
   }
   const db = await localDb();
   const result = await db.query<{ data: Story[] }>(
     "select read_newsroom() as data",
   );
-  return result.rows[0].data;
+  return result.rows[0].data
+    .filter((s) => s.is_demo === (dataMode() === "demo"))
+    .map(orderSources);
 }
 export async function saveStory(story: Story, expectedVersion: number) {
   if (isConnected()) {

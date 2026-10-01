@@ -1,3 +1,4 @@
+import type { DiscoveryInsights } from "../ingestion/types";
 export const statuses = [
   "detected",
   "verified",
@@ -129,6 +130,7 @@ export interface Publication {
   created_at: string;
 }
 export interface Story {
+  discovery?: DiscoveryInsights;
   id: string;
   title: string;
   summary: string;

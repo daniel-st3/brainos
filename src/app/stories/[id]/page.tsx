@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Observation } from "@/components/discovery-actions";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { newsroom } from "@/server/data";
@@ -29,10 +30,10 @@ export default async function StoryPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; brief?: string; rank?: string }>;
 }) {
   const { id } = await params,
-    { tab = "overview" } = await searchParams;
+    { tab = "overview", brief, rank } = await searchParams;
   const story = (await newsroom()).find((s) => s.id === id);
   if (!story) notFound();
   const views = {
@@ -48,6 +49,24 @@ export default async function StoryPage({
   const Panel = views[tab as keyof typeof views] ?? Overview;
   return (
     <>
+      {!story.is_demo && (
+        <Observation
+          storyId={id}
+          kind="opened"
+          briefId={brief && /^[0-9a-f-]{36}$/i.test(brief) ? brief : null}
+          rank={
+            rank && Number(rank) > 0 && Number(rank) <= 100
+              ? Number(rank)
+              : null
+          }
+        />
+      )}
+      {story.discovery?.needs_review && (
+        <div className="notice">
+          Source material changed. Review the retained new excerpt and reconfirm
+          research; prior approval is no longer current.
+        </div>
+      )}
       <Link className="back-link" href="/inbox">
         <ArrowLeft size={15} />
         Story inbox

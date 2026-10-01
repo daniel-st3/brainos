@@ -87,11 +87,38 @@ export function Sources({ story }: { story: Story }) {
               </dd>
             </div>
             <div>
-              <dt>Fixture recorded</dt>
+              <dt>{story.is_demo ? "Fixture recorded" : "Retrieved"}</dt>
               <dd>
                 <DateText value={s.retrieved_at} />
               </dd>
             </div>
+            {story.discovery?.source_times?.[s.id] && (
+              <>
+                <div>
+                  <dt>Feed updated</dt>
+                  <dd>
+                    <DateText
+                      value={story.discovery.source_times[s.id].updated_at}
+                    />
+                  </dd>
+                </div>
+                <div>
+                  <dt>Timestamp basis</dt>
+                  <dd>{story.discovery.source_times[s.id].timestamp_note}</dd>
+                </div>
+                <div>
+                  <dt>Original timestamp</dt>
+                  <dd>
+                    {story.discovery.source_times[s.id].original_timestamp ??
+                      "Not supplied"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Evidence hash</dt>
+                  <dd>{story.discovery.source_times[s.id].content_hash}</dd>
+                </div>
+              </>
+            )}
             <div>
               <dt>Reliability / limits</dt>
               <dd>{s.reliability}</dd>
@@ -250,6 +277,19 @@ export function Angles({ story }: { story: Story }) {
         />
       </div>
       <div className="angle-grid">
+        {story.discovery?.suggestions?.map((suggestion) => (
+          <article className="panel angle-card" key={suggestion.kind}>
+            <span className="tag">
+              {suggestion.kind.replaceAll("_", " ")} · SYSTEM SUGGESTION
+            </span>
+            <h3>{suggestion.text}</h3>
+            <p className="subtle">
+              An editorial prompt, not Daniel’s confirmed opinion. Write and
+              explicitly approve an angle before drafting.
+            </p>
+            <div className="provenance">{suggestion.provenance}</div>
+          </article>
+        ))}
         {story.angles.map((a) => (
           <article className="panel angle-card" key={a.id}>
             <div className="inline-meta">
@@ -513,8 +553,8 @@ export function Assets({ story }: { story: Story }) {
         <div>
           <strong>Publicly accessible does not mean publishable.</strong>
           <p>
-            Clearance needs a documented usage basis. These demo records do not
-            grant rights to real media.
+            Clearance needs a documented usage basis. Discovery does not grant
+            rights to real media.
           </p>
         </div>
       </div>
@@ -847,9 +887,9 @@ export function Overview({ story }: { story: Story }) {
         <div className="notice">
           <AlertCircle size={18} />
           <p>
-            Demo scenario. Original source fixtures and approved demo revisions
-            illustrate the workflow; they are not current news or real test
-            results.
+            {story.is_demo
+              ? "Demo scenario. Original source fixtures and approved demo revisions illustrate the workflow; they are not current news or real test results."
+              : "Live discovery. Feed excerpts describe publisher statements, not independently verified results. Review each claim against its original evidence."}
           </p>
         </div>
       </section>

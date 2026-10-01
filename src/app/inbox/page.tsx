@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { dataMode } from "@/server/mode";
+import { MissedStoryForm } from "@/components/discovery-actions";
 import { newsroom } from "@/server/data";
 import {
   PageHeader,
@@ -34,6 +37,16 @@ export default async function Inbox({
         title="Signals worth a closer look."
         description="Find the source. Check the claim. Choose what matters."
       />
+      {dataMode() === "live" && (
+        <div className="section-heading">
+          <Link href="/sources" className="text-link">
+            Source health and refresh
+          </Link>
+          <Link href="/pilot" className="text-link">
+            Pilot log
+          </Link>
+        </div>
+      )}
       <form className="filter-bar" method="get">
         <label className="search-label">
           <span>Search stories</span>
@@ -83,6 +96,7 @@ export default async function Inbox({
         {stories.length} STORIES{" "}
         <span>Original timestamps preserved · display in Bogotá time</span>
       </div>
+      {dataMode() === "live" && <MissedStoryForm />}
       <div className="inbox-list">
         {stories.map((s, i) => (
           <article className="inbox-card" key={s.id}>
@@ -92,7 +106,9 @@ export default async function Inbox({
             <div className="inbox-body">
               <div className="inline-meta">
                 <span className="small-cap">{s.pillar}</span>
-                <span className="demo-label">DEMO</span>
+                <span className="demo-label">
+                  {s.is_demo ? "DEMO" : "LIVE DISCOVERY"}
+                </span>
                 {s.priority && <span className="priority-mark">PRIORITY</span>}
               </div>
               <StoryLink story={s} />
@@ -101,7 +117,12 @@ export default async function Inbox({
                 <strong>{s.sources[0]?.publisher}</strong>
                 <span>{s.sources[0]?.tier} source</span>
                 <span>
-                  Published: <DateText value={s.published_at} />
+                  {s.published_at ? "Published" : "Feed updated"}:{" "}
+                  <DateText
+                    value={
+                      s.published_at ?? s.discovery?.source_updated_at ?? null
+                    }
+                  />
                 </span>
               </div>
               <div className="inbox-signals">

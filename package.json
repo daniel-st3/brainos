@@ -11,9 +11,10 @@
     "test": "vitest run",
     "db:validate": "tsx scripts/validate-db.ts",
     "db:reset": "tsx scripts/reset-demo.ts",
-    "test:e2e": "tsx scripts/reset-e2e.ts && playwright test",
+    "test:e2e": "tsx scripts/reset-e2e.ts && tsx scripts/seed-live-e2e.ts && playwright test",
     "db:seed:supabase": "tsx --env-file=.env.local scripts/seed-supabase.ts",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"*.ts\" \"*.mjs\" \"*.json\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"*.ts\" \"*.mjs\" \"*.json\"",
+    "ingest": "tsx scripts/ingest.ts"
   },
   "engines": {
     "node": ">=22"
@@ -23,11 +24,13 @@
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.2",
     "@trigger.dev/sdk": "4.6.4",
+    "fast-xml-parser": "5.11.2",
     "lucide-react": "1.49.0",
     "next": "16.3.8",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "0.0.1",
+    "undici": "8.11.2",
     "zod": "4.6.5"
   },
   "devDependencies": {
