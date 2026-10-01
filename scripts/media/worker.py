@@ -3,6 +3,7 @@
 import argparse, base64, hashlib, json, mimetypes, os, re, subprocess, sys, threading, time, urllib.request, urllib.error, uuid
 from pathlib import Path
 from datetime import datetime, timezone
+from runtime import ActiveJob, WorkerLock, watch, setup_logging, safe_error, LOG
 
 
 def read_env(filename):
@@ -382,7 +383,7 @@ def process_one():
     work.mkdir(parents=True, exist_ok=True)
     os.chmod(work, 0o700)
     try:
-        with Lease(job) as lease:
+        with ActiveJob(job), Lease(job) as lease:
             file = obtain(data["source"], work)
             original_hash = sha(file)
             p = data["package"]
@@ -446,10 +447,10 @@ def process_one():
             (work / "result.json").write_text(
                 json.dumps(result, ensure_ascii=False, indent=2)
             )
-            print(f"{job['kind']} succeeded: {job['id']}", flush=True)
+            LOG.info("job succeeded kind=%s id=%s", job["kind"], job["id"])
     except Exception as e:
         # Never print signed URLs or token-bearing request objects.
-        message = str(e) if isinstance(e, RuntimeError) else type(e).__name__
+        message = safe_error(e)
         try:
             api(
                 {
@@ -461,12 +462,13 @@ def process_one():
             )
         except Exception:
             pass
-        print(f"{job['kind']} failed: {message}", file=sys.stderr, flush=True)
+        LOG.error("job failed kind=%s id=%s: %s", job["kind"], job["id"], message)
         raise
     return True
 
 
 def main():
+    os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env", default=".env.worker.local")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -519,14 +521,11 @@ def main():
         )
         return
     if args.command == "once":
-        process_one()
-        return
-    while True:
-        try:
+        setup_logging()
+        with WorkerLock():
             process_one()
-        except Exception:
-            pass
-        time.sleep(10)
+        return
+    watch(process_one)
 
 
 if __name__ == "__main__":

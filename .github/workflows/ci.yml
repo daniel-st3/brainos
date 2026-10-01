@@ -18,6 +18,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - name: Check local worker lifecycle
+        run: python3 -m unittest discover -s scripts/media -p 'test_*.py'
       - run: npm run db:validate
       - run: npm run build
       - run: npx playwright install --with-deps chromium

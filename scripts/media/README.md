@@ -27,7 +27,7 @@ chmod 600 .env.worker.local
 .venv-media/bin/python scripts/media/worker.py watch
 ```
 
-Set `BRAINOS_URL`, a dedicated random `PRODUCTION_WORKER_TOKEN` shared with the preview runtime, and `MEDIA_INPUT_ROOT` to a directory of recordings. A protected Vercel preview additionally needs `VERCEL_AUTOMATION_BYPASS_SECRET`. These stay in the private env file. Never put Supabase's service key or infrastructure tokens in the worker file. `once` processes one job; `watch` checks every ten seconds until Ctrl-C. The Mac must be awake. No launch agent or background service is installed automatically.
+Set `BRAINOS_URL`, a dedicated random `PRODUCTION_WORKER_TOKEN` shared with the preview runtime, and `MEDIA_INPUT_ROOT` to a directory of recordings. A protected Vercel preview additionally needs `VERCEL_AUTOMATION_BYPASS_SECRET`. These stay in the private env file. Never put Supabase's service key or infrastructure tokens in the worker file. `once` processes one job; `watch` checks every 60 seconds until Ctrl-C and excludes a second local worker using a singleton lock. The Mac must be awake. For login startup and crash recovery, use `scripts/media/service.py install`; see [service operations](../../docs/local-worker-service.md).
 
 Register a local recording without manually copying JSON:
 
