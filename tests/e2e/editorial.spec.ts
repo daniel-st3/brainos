@@ -71,13 +71,11 @@ test("editorial package: evidence, blocked clearance, revision approval, product
     page.getByRole("heading", { name: "Your review desk is clear" }),
   ).toBeVisible();
   await page.goto("/production");
-  const production = page
-    .locator("article")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "Can a meeting assistant earn its place in the stack?",
-      }),
-    });
+  const production = page.locator("article").filter({
+    has: page.getByRole("heading", {
+      name: "Can a meeting assistant earn its place in the stack?",
+    }),
+  });
   await production.getByLabel("Script / copy checked").check();
   await production.getByLabel("Copy proofread for output").check();
   await production
@@ -90,13 +88,11 @@ test("editorial package: evidence, blocked clearance, revision approval, product
     production.getByText("Preparation complete", { exact: true }),
   ).toBeVisible();
   await page.goto("/publish");
-  const publication = page
-    .locator("article")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "Can a meeting assistant earn its place in the stack?",
-      }),
-    });
+  const publication = page.locator("article").filter({
+    has: page.getByRole("heading", {
+      name: "Can a meeting assistant earn its place in the stack?",
+    }),
+  });
   await expect(publication).toContainText("APPROVED v4");
   await publication
     .getByLabel("Destination", { exact: true })
@@ -185,5 +181,74 @@ test("main routes work on mobile without document overflow", async ({
   await page.getByRole("link", { name: "Story Inbox", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Signals worth a closer look." }),
+  ).toBeVisible();
+});
+
+test("detected story advances through human research and mock generation into recording", async ({
+  page,
+}) => {
+  const path = "/stories/00000000-0000-4000-8000-000000000100";
+  await page.goto(path + "?tab=claims");
+  await page.getByRole("button", { name: "Mark verified" }).click();
+  await expect(page.locator(".form-error[role=alert]")).toContainText(
+    "primary evidence",
+  );
+  await page
+    .getByText("Record a human evidence check", { exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Verification", exact: true })
+    .selectOption("supported");
+  await page
+    .getByLabel("Verification notes")
+    .fill(
+      "Checked against the original fictional scenario, not a live news claim.",
+    );
+  await page.getByRole("button", { name: "Save evidence check" }).click();
+  await expect(page.locator(".claim-panel .rights")).toHaveText("supported");
+  await page.getByRole("button", { name: "Mark verified" }).click();
+  await expect(
+    page.getByRole("button", { name: "Complete research" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "research", exact: true }).click();
+  await page
+    .getByLabel("Structured notes")
+    .fill(
+      "Demo research checked. No live release, availability or performance is asserted.",
+    );
+  await page
+    .getByRole("checkbox", { name: /I checked the source evidence/ })
+    .check();
+  await page.getByRole("button", { name: "Save research notes" }).click();
+  await expect(
+    page.getByRole("button", { name: "Save research notes" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Complete research" }).click();
+  await expect(
+    page.getByRole("button", { name: "Confirm angle selection" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "angles", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Approve this angle" })
+    .first()
+    .click();
+  await expect(page.getByText("Confirmed for this story only")).toBeVisible();
+  await page.getByRole("button", { name: "Confirm angle selection" }).click();
+  await page.getByRole("link", { name: "Create a draft", exact: true }).click();
+  await page.getByLabel("Target format").selectOption("short_video");
+  await page.getByRole("button", { name: "Generate demo draft" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Short video v1" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Check asset clearance" }).click();
+  await page.getByRole("button", { name: "Move to production" }).click();
+  await expect(page.locator(".workflow-next .status")).toHaveText(
+    "Recording needed",
+  );
+  await page.goto("/production");
+  await expect(
+    page.getByRole("heading", {
+      name: "An AI release is only useful if it changes the workflow",
+    }),
   ).toBeVisible();
 });

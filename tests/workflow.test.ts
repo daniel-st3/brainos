@@ -411,3 +411,30 @@ describe("complete lifecycle and revision recovery", () => {
     ).rejects.toThrow("unapproved revision");
   });
 });
+
+describe("verification source identity", () => {
+  it("rejects an unrelated primary source when the claim only cites secondary reporting", async () => {
+    const s = createDemoStories()[0];
+    s.claims[0].verification_status = "supported";
+    s.sources[0].is_primary = false;
+    s.sources[0].tier = "journalism";
+    // The NIST background reference remains primary but does not support this claim.
+    expect(s.sources.some((source) => source.is_primary)).toBe(true);
+    await expect(
+      applyCommand(s, { type: "transition", target: "verified" }, actor),
+    ).rejects.toThrow("primary evidence");
+  });
+  it("requires both primary classification and a matching evidence excerpt", async () => {
+    const s = createDemoStories()[0];
+    s.claims[0].verification_status = "supported";
+    s.sources[0].tier = "journalism";
+    await expect(
+      applyCommand(s, { type: "transition", target: "verified" }, actor),
+    ).rejects.toThrow("primary evidence");
+    s.sources[0].tier = "primary";
+    s.evidence[0].excerpt = "An unsupported statement";
+    await expect(
+      applyCommand(s, { type: "transition", target: "verified" }, actor),
+    ).rejects.toThrow("primary evidence");
+  });
+});

@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { Command } from "@/domain/commands";
 export function CommandForm({
@@ -23,6 +23,8 @@ export function CommandForm({
     [error, setError] = useState(""),
     [success, setSuccess] = useState(false);
   const router = useRouter();
+  const [refreshing, startRefresh] = useTransition();
+  const busy = pending || refreshing;
   return (
     <form
       className={`command-form ${variant}`}
@@ -31,20 +33,20 @@ export function CommandForm({
         setPending(true);
         setError("");
         setSuccess(false);
-        const data = new FormData(event.currentTarget),
-          payload: Record<string, unknown> = { ...command };
-        for (const [key, value] of data.entries()) payload[key] = value;
-        for (const key of arrays) payload[key] = data.getAll(key);
-        if (command.type === "research" || command.type === "approve")
-          payload.confirmed = data.get("confirmed") === "on";
-        if (
-          command.type === "schedule" &&
-          typeof payload.scheduledAt === "string"
-        )
-          payload.scheduledAt = new Date(
-            `${payload.scheduledAt}:00-05:00`,
-          ).toISOString();
         try {
+          const data = new FormData(event.currentTarget),
+            payload: Record<string, unknown> = { ...command };
+          for (const [key, value] of data.entries()) payload[key] = value;
+          for (const key of arrays) payload[key] = data.getAll(key);
+          if (command.type === "research" || command.type === "approve")
+            payload.confirmed = data.get("confirmed") === "on";
+          if (
+            command.type === "schedule" &&
+            typeof payload.scheduledAt === "string"
+          )
+            payload.scheduledAt = new Date(
+              `${payload.scheduledAt}:00-05:00`,
+            ).toISOString();
           const response = await fetch("/api/commands", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -57,7 +59,7 @@ export function CommandForm({
           const result = await response.json();
           if (!response.ok) throw new Error(result.error);
           setSuccess(true);
-          router.refresh();
+          startRefresh(() => router.refresh());
         } catch (e) {
           setError(e instanceof Error ? e.message : "Unable to save.");
         } finally {
@@ -68,10 +70,10 @@ export function CommandForm({
       {children}
       <button
         className={`button ${variant === "danger" ? "danger" : variant === "quiet" ? "secondary" : ""}`}
-        disabled={pending}
+        disabled={busy}
         type="submit"
       >
-        {pending ? "Saving…" : label}
+        {busy ? "Saving…" : label}
       </button>
       {error && (
         <p className="form-error" role="alert">

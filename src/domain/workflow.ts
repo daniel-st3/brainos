@@ -170,7 +170,10 @@ export async function applyCommand(
                     e.excerpt.trim() &&
                     story.sources.some(
                       (s) =>
-                        s.id === e.source_id && s.excerpt.includes(e.excerpt),
+                        s.id === e.source_id &&
+                        s.is_primary &&
+                        s.tier === "primary" &&
+                        s.excerpt.includes(e.excerpt),
                     ),
                 ),
             ),
