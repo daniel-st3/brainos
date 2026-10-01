@@ -1,6 +1,8 @@
 import { task, schedules } from "@trigger.dev/sdk";
 import { ingestionStore } from "../ingestion/store";
 import { runIngestion } from "../ingestion/pipeline";
+import { enqueueEditorialWork, runOperations } from "../operations/worker";
+import type { Story } from "../domain/types";
 // Hosted workers must share the same durable database as the newsroom.
 async function ingest(sourceIds?: string[]) {
   if (
@@ -10,7 +12,21 @@ async function ingest(sourceIds?: string[]) {
     throw new Error(
       "Hosted ingestion requires Supabase and CONTENT_OS_DATA_MODE=live.",
     );
-  return runIngestion(await ingestionStore(), { sourceIds });
+  const store = await ingestionStore();
+  const runs = await runIngestion(store, { sourceIds });
+  await enqueueEditorialWork(
+    store.rpc,
+    (await store.rpc("read_newsroom")) as Story[],
+  );
+  const operations = await runOperations(store.rpc, 100);
+  if (
+    operations.some((o) => o.status === "failed") ||
+    runs.some((r) => r.status === "failed" || r.status === "partial")
+  )
+    throw new Error(
+      "Some ingestion sources failed; inspect persisted ingestion runs.",
+    );
+  return { runs, operations };
 }
 const deferred = (capability: string) => ({
   status: "configuration_required" as const,
@@ -36,10 +52,16 @@ export const morningDiscovery = schedules.task({
 });
 export const enrichStory = task({
   id: "enrich-story",
-  run: async (payload: { storyId: string }) => ({
-    ...deferred("Evidence retrieval and research"),
-    storyId: payload.storyId,
-  }),
+  run: async () => {
+    if (process.env.CONTENT_OS_MODE !== "supabase")
+      throw new Error("Hosted operations require Supabase.");
+    const store = await ingestionStore();
+    await enqueueEditorialWork(
+      store.rpc,
+      (await store.rpc("read_newsroom")) as Story[],
+    );
+    return runOperations(store.rpc, 100);
+  },
 });
 export const monitorCompetitors = task({
   id: "monitor-competitors",
@@ -47,5 +69,14 @@ export const monitorCompetitors = task({
 });
 export const analyticsSnapshot = task({
   id: "analytics-snapshot",
-  run: async () => deferred("Analytics snapshots — disabled"),
+  run: async () => {
+    if (process.env.CONTENT_OS_MODE !== "supabase")
+      throw new Error("Hosted operations require Supabase.");
+    const store = await ingestionStore();
+    await enqueueEditorialWork(
+      store.rpc,
+      (await store.rpc("read_newsroom")) as Story[],
+    );
+    return runOperations(store.rpc, 100);
+  },
 });

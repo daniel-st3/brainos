@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ResearchAid } from "@/components/research-aid";
 import { Observation } from "@/components/discovery-actions";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -103,6 +104,9 @@ export default async function StoryPage({
       </nav>
       <div className="workspace-content">
         <Panel story={story} />
+        {tab === "research" && !story.is_demo && (
+          <ResearchAid storyId={story.id} />
+        )}
       </div>
     </>
   );

@@ -9,3 +9,5 @@ playwright-report/
 *.tsbuildinfo
 .supabase/
 supabase/.temp/
+.vercel/
+supabase/functions/newsroom/bundle.js

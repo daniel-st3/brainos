@@ -14,7 +14,10 @@
     "test:e2e": "tsx scripts/reset-e2e.ts && tsx scripts/seed-live-e2e.ts && playwright test",
     "db:seed:supabase": "tsx --env-file=.env.local scripts/seed-supabase.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"*.ts\" \"*.mjs\" \"*.json\"",
-    "ingest": "tsx scripts/ingest.ts"
+    "ingest": "tsx scripts/ingest.ts",
+    "operations": "tsx scripts/operations.ts",
+    "storage:setup": "tsx scripts/setup-storage.ts",
+    "runtime:check": "tsx scripts/check-runtime.ts"
   },
   "engines": {
     "node": ">=22"

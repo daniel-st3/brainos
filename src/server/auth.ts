@@ -25,6 +25,7 @@ export async function authClient() {
   );
 }
 export async function editor() {
+  if (!isConnected() && process.env.VERCEL) throw new Error("Unauthorized");
   if (!isConnected())
     return dataMode() === "demo"
       ? "Daniel · local demo"

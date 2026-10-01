@@ -17,7 +17,8 @@ try {
     force: process.argv.includes("--force"),
   });
   console.log(JSON.stringify(runs, null, 2));
-  if (runs.some((r) => r.status === "failed")) process.exitCode = 1;
+  if (runs.some((r) => r.status === "failed" || r.status === "partial"))
+    process.exitCode = 1;
 } finally {
   await closeFeedConnections();
   await closeLocalDb();

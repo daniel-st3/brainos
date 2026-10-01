@@ -1,0 +1,34 @@
+name: Morning newsroom
+# Explicit manual dispatch works on a candidate branch. GitHub schedules run only
+# from its default branch; this file does NOT make a candidate schedule live.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 11 * * *' # 06:30 America/Bogota; Colombia has no DST.
+permissions:
+  contents: read
+concurrency:
+  group: newsroom-ingestion
+  cancel-in-progress: false
+jobs:
+  morning:
+    if: vars.NEWSROOM_SCHEDULER == 'github'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CONTENT_OS_MODE: supabase
+      CONTENT_OS_DATA_MODE: live
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Verify runtime configuration
+        run: node -e 'if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) throw Error("Supabase runtime secrets missing")'
+      - run: npm run ingest
+      - run: npm run operations
+        if: ${{ !cancelled() }}

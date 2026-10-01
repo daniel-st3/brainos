@@ -1,7 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
-  if (process.env.CONTENT_OS_MODE !== "supabase") return NextResponse.next();
+  if (process.env.CONTENT_OS_MODE !== "supabase") {
+    if (process.env.VERCEL)
+      return new NextResponse(
+        "Private hosting requires Supabase configuration.",
+        { status: 503 },
+      );
+    return NextResponse.next();
+  }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
     key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key)
@@ -21,7 +28,19 @@ export async function proxy(request: NextRequest) {
       },
     },
   });
-  await client.auth.getUser();
+  const {
+    data: { user },
+  } = await client.auth.getUser();
+  if (
+    request.nextUrl.pathname !== "/login" &&
+    (!user ||
+      !process.env.CONTENT_OS_EDITOR_ID ||
+      user.id !== process.env.CONTENT_OS_EDITOR_ID)
+  ) {
+    if (request.nextUrl.pathname.startsWith("/api/"))
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
   return response;
 }
 export const config = {

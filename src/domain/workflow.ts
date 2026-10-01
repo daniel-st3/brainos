@@ -1,5 +1,6 @@
 import { commandSchema, type Command } from "./commands";
 import { demoAI } from "@/services/ai";
+import { liveEditorial } from "@/services/live-editorial";
 import type { Draft, Story, StoryStatus } from "./types";
 export class WorkflowError extends Error {}
 export const transitions: Record<StoryStatus, readonly StoryStatus[]> = {
@@ -103,6 +104,10 @@ export async function applyCommand(
 ): Promise<Story> {
   const command = commandSchema.parse(input);
   const story = structuredClone(original);
+  const generator = story.is_demo ? demoAI : liveEditorial;
+  const provenance = story.is_demo
+    ? "deterministic-demo/v1"
+    : "deterministic-editorial/v1";
   const log = (
     type: string,
     detail: string,
@@ -297,7 +302,7 @@ export async function applyCommand(
     }
     case "suggest_angles":
       editable();
-      for (const a of await demoAI.suggestAngles(story))
+      for (const a of await generator.suggestAngles(story))
         story.angles.push({
           ...a,
           id: crypto.randomUUID(),
@@ -307,11 +312,11 @@ export async function applyCommand(
           approved_by: null,
           approved_at: null,
           created_at: now,
-          provenance: "deterministic-demo/v1",
+          provenance,
         });
       log(
         "angles_suggested",
-        "Three mock AI suggestions created; none confirmed as Daniel’s opinion.",
+        "Three generated suggestions created; none confirmed as Daniel’s opinion.",
       );
       break;
     case "add_angle":
@@ -357,7 +362,11 @@ export async function applyCommand(
         angle?.approval_state === "approved",
         "Approve the angle before drafting.",
       );
-      const output = await demoAI.generateDraft(story, angle, command.platform);
+      const output = await generator.generateDraft(
+        story,
+        angle,
+        command.platform,
+      );
       const d: Draft = {
         ...output,
         id: crypto.randomUUID(),
@@ -378,7 +387,7 @@ export async function applyCommand(
         approved_at: null,
         approved_by: null,
         created_at: now,
-        provenance: "deterministic-demo/v1",
+        provenance,
       };
       invalidate("New draft selected.");
       story.drafts.push(d);
