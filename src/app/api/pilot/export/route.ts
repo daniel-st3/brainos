@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { editor } from "@/server/auth";
 import { dataMode } from "@/server/mode";
 import { ingestionStore } from "@/ingestion/store";
-import { eventsInPilot, type PilotStudy } from "@/domain/pilot";
+import { pilotStoryEvents, type PilotStudy } from "@/domain/pilot";
 import { strongestSource } from "@/ingestion/provenance";
 export async function GET() {
   try {
@@ -19,7 +19,7 @@ export async function GET() {
         { error: "Start the pilot first." },
         { status: 409 },
       );
-    const events = eventsInPilot(
+    const events = pilotStoryEvents(
       (await store.state()).pilot,
       study.config.starts_on,
     );
@@ -46,6 +46,7 @@ export async function GET() {
             "Useful-story counts and minutes are self-reported.",
             "Browser observations are best-effort, not complete recall measurement.",
             "Draft creation is not publication or audience performance.",
+            "Later draft-creation events remain included for stories observed during the pilot window.",
           ],
         },
         null,

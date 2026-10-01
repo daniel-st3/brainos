@@ -69,6 +69,22 @@ export function eventsInPilot(events: PilotEvent[], start: string) {
     return day >= start && day <= end;
   });
 }
+// Discovery/judgment observations define the pilot cohort. A story may become
+// content later, so retain that outcome without admitting unrelated new stories.
+export function pilotStoryEvents(events: PilotEvent[], start: string) {
+  const inWindow = eventsInPilot(events, start);
+  const storyIds = new Set(inWindow.map((event) => event.story_id));
+  const end = addDays(start, 9);
+  return [
+    ...inWindow,
+    ...events.filter(
+      (event) =>
+        event.kind === "content_created" &&
+        storyIds.has(event.story_id) &&
+        bogotaDate(new Date(event.created_at)) > end,
+    ),
+  ];
+}
 export function dailyObservations(events: PilotEvent[], day: string) {
   const rows = events.filter((e) => bogotaDate(new Date(e.created_at)) === day);
   const unique = (kind: string) =>

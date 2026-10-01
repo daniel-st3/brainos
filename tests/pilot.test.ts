@@ -8,6 +8,7 @@ import {
   dateOnly,
   daySchema,
   eventsInPilot,
+  pilotStoryEvents,
   dailyObservations,
   pilotDates,
   type PilotStudy,
@@ -115,5 +116,50 @@ describe("ten-day pilot", () => {
       "select has_table_privilege('anon','pilot_days','SELECT') or has_function_privilege('authenticated','save_pilot_day(jsonb,text)','EXECUTE') as allowed",
     );
     expect(result.rows[0].allowed).toBe(false);
+  });
+  it("retains later content outcomes only for pilot stories without extending daily observations", () => {
+    const event = (
+      id: string,
+      story: string,
+      kind: string,
+      time: string,
+    ): PilotEvent => ({
+      id,
+      story_id: story,
+      kind,
+      brief_id: null,
+      rank: null,
+      actor: "Daniel",
+      created_at: time,
+    });
+    const rows = [
+      event("seen", "pilot-story", "surfaced", "2026-09-30T15:00:00Z"),
+      event("before", "pilot-story", "content_created", "2026-09-29T15:00:00Z"),
+      event("last-day", "pilot-story", "prioritized", "2026-10-10T04:59:59Z"),
+      event(
+        "later-draft",
+        "pilot-story",
+        "content_created",
+        "2026-10-10T05:00:00Z",
+      ),
+      event("later-click", "pilot-story", "opened", "2026-10-10T05:00:00Z"),
+      event(
+        "unrelated",
+        "not-in-pilot",
+        "content_created",
+        "2026-10-10T05:00:00Z",
+      ),
+    ];
+    const selected = pilotStoryEvents(rows, "2026-09-30");
+    expect(selected.map((e) => e.id)).toEqual([
+      "seen",
+      "last-day",
+      "later-draft",
+    ]);
+    expect(eventsInPilot(selected, "2026-09-30").map((e) => e.id)).toEqual([
+      "seen",
+      "last-day",
+    ]);
+    expect(dailyObservations(selected, "2026-10-09").drafted).toBe(0);
   });
 });

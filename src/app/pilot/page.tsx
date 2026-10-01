@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PilotStudyPanel } from "@/components/pilot-study";
-import { eventsInPilot, type PilotStudy } from "@/domain/pilot";
+import { pilotStoryEvents, type PilotStudy } from "@/domain/pilot";
 import { dataMode } from "@/server/mode";
 import { newsroom } from "@/server/data";
 import { ingestionStore } from "@/ingestion/store";
@@ -11,7 +11,7 @@ export default async function Pilot() {
   const state = await store.state();
   const study = (await store.rpc("read_pilot_study")) as PilotStudy;
   const observations = study.config
-    ? eventsInPilot(state.pilot, study.config.starts_on)
+    ? pilotStoryEvents(state.pilot, study.config.starts_on)
     : state.pilot;
   const rows = stories.filter((s) =>
     observations.some((e) => e.story_id === s.id),
@@ -37,6 +37,8 @@ export default async function Pilot() {
         background prefetch. Missing observations are not proof that a story was
         ignored. Manual-miss entries support recall review against Daniel’s own
         browsing.
+        {study.config &&
+          " Draft creation remains associated with pilot stories after day ten."}
       </p>
       <div className="panel flush table-wrap">
         <table>
