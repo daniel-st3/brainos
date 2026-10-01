@@ -5,6 +5,7 @@ import { evidenceFingerprint, researchPacket } from "./research";
 import { approvedProductionPacket, postRecordingPlan } from "./production";
 import {
   analyticsAdapters,
+  analyticsProviderFor,
   snapshotDue,
   snapshotWindows,
   type AnalyticsProvider,
@@ -55,8 +56,8 @@ export async function enqueueEditorialWork(rpc: Rpc, stories: Story[]) {
         (e) => e.to_status === "published" && e.draft_id === pub.draft_id,
       )?.created_at;
       if (!published) continue;
-      const provider =
-        pub.platform === "short_video" ? "youtube" : pub.platform;
+      const provider = analyticsProviderFor(pub.platform, pub.published_url!);
+      if (!provider) continue;
       for (const hours of snapshotWindows)
         await rpc("enqueue_operation", {
           p_kind: "analytics",

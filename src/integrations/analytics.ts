@@ -20,3 +20,23 @@ export function snapshotDue(
     throw new Error("Actual publication timestamp required");
   return new Date(time + hours * 3600000).toISOString();
 }
+/** Video is a format, not a provider. Infer only from the recorded public URL. */
+export function analyticsProviderFor(
+  platform: string,
+  publishedUrl: string,
+): AnalyticsProvider | null {
+  if (platform === "newsletter") return "newsletter";
+  let host: string;
+  try {
+    host = new URL(publishedUrl).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  const matches = (domain: string) =>
+    host === domain || host.endsWith(`.${domain}`);
+  if (matches("youtube.com") || host === "youtu.be") return "youtube";
+  if (matches("tiktok.com")) return "tiktok";
+  if (matches("instagram.com")) return "instagram";
+  if (matches("x.com") || matches("twitter.com")) return "x";
+  return null;
+}

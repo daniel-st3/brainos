@@ -14,7 +14,10 @@ import {
   sourceCard,
 } from "../src/operations/production";
 import { publishingHandoff } from "../src/integrations/publishing";
-import { snapshotDue } from "../src/integrations/analytics";
+import {
+  snapshotDue,
+  analyticsProviderFor,
+} from "../src/integrations/analytics";
 import { liveEditorial } from "../src/services/live-editorial";
 import type { Story } from "../src/domain/types";
 let db: PGlite, rpc: Rpc;
@@ -294,5 +297,22 @@ describe("operational automation", () => {
       [id],
     );
     expect(row.rows[0]).toEqual({ status: "blocked", result: null });
+  });
+  it("routes analytics by real publication host instead of assuming every short video is YouTube", () => {
+    expect(
+      analyticsProviderFor(
+        "short_video",
+        "https://www.tiktok.com/@creator/video/123",
+      ),
+    ).toBe("tiktok");
+    expect(analyticsProviderFor("short_video", "https://youtu.be/abc")).toBe(
+      "youtube",
+    );
+    expect(
+      analyticsProviderFor(
+        "short_video",
+        "https://youtube.com.unrelated.example/video",
+      ),
+    ).toBeNull();
   });
 });
