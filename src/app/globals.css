@@ -1896,3 +1896,20 @@ td:first-child {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 16px;
 }
+
+/* Production workspace extends the existing editorial layout. */
+.studio { display:grid; gap:24px; }
+.studio .panel { padding:28px; }
+.studio-toolbar { display:flex; flex-wrap:wrap; gap:20px; align-items:center; margin:12px 0; }
+.studio form { display:grid; gap:12px; margin:20px 0; max-width:760px; }
+.studio label:not(.check) { display:grid; gap:6px; }
+.studio select,.studio input:not([type=checkbox]),.studio textarea { width:100%; padding:10px; border:1px solid #ccd4cf; border-radius:4px; background:#fff; color:#182d27; }
+.studio details { padding:14px 0; border-bottom:1px solid #dfe5e0; }
+.studio-piece { display:flex; gap:16px; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid #e3e8e5; }
+.studio-script { white-space:pre-wrap; font:inherit; line-height:1.8; }
+.studio-video { display:block; width:100%; max-width:480px; max-height:640px; background:#111; margin:20px 0; }
+.studio-error { color:#8b2929; border:1px solid #d9a7a7; }
+.studio .button { width:fit-content; margin-right:8px; }
+.studio h3 { margin-top:28px; }
+.studio code { overflow-wrap:anywhere; }
+@media(max-width:700px){.studio .panel{padding:18px}.studio-piece{flex-wrap:wrap}.studio-detail .section-heading{display:block}}

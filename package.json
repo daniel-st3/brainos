@@ -17,7 +17,8 @@
     "ingest": "tsx scripts/ingest.ts",
     "operations": "tsx scripts/operations.ts",
     "storage:setup": "tsx scripts/setup-storage.ts",
-    "runtime:check": "tsx scripts/check-runtime.ts"
+    "runtime:check": "tsx scripts/check-runtime.ts",
+    "production:setup": "tsx scripts/setup-production.ts"
   },
   "engines": {
     "node": ">=22"

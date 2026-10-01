@@ -11,3 +11,7 @@ playwright-report/
 supabase/.temp/
 .vercel/
 supabase/functions/newsroom/bundle.js
+
+.venv-media/
+__pycache__/
+!.env.worker.example

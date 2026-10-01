@@ -20,6 +20,11 @@ export default async function Production() {
         title="Make room for making."
         description="Batch your recording. Prepare your visuals. Keep the approved copy in view."
       />
+      <p>
+        <Link className="button" href="/production/studio">
+          Abrir estudio de grabación y edición
+        </Link>
+      </p>
       <div className="notice">
         <CheckCircle2 size={18} />
         <p>

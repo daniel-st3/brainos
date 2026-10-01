@@ -136,7 +136,9 @@ test("server rejects shortcuts, stale revisions and cross-origin writes", async 
   };
   const forbidden = await request.post("/api/commands", {
     data: payload,
-    headers: { Origin: "http://localhost:3100" },
+    headers: {
+      Origin: `http://localhost:${Number(process.env.E2E_PORT_BASE ?? 3100)}`,
+    },
   });
   expect(forbidden.status()).toBe(422);
   const stale = await request.post("/api/commands", {
@@ -145,7 +147,9 @@ test("server rejects shortcuts, stale revisions and cross-origin writes", async 
       expectedVersion: s.version + 99,
       command: { type: "prioritize" },
     },
-    headers: { Origin: "http://localhost:3100" },
+    headers: {
+      Origin: `http://localhost:${Number(process.env.E2E_PORT_BASE ?? 3100)}`,
+    },
   });
   expect(stale.status()).toBe(409);
   const cross = await request.post("/api/commands", {

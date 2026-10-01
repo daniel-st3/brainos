@@ -1,22 +1,24 @@
 import { defineConfig } from "@playwright/test";
 import { existsSync } from "node:fs";
+const demoPort = Number(process.env.E2E_PORT_BASE ?? 3100);
+const livePort = demoPort + 1;
 export default defineConfig({
   projects: [
     {
       name: "editorial-demo",
       testDir: "tests/e2e",
-      use: { baseURL: "http://localhost:3100" },
+      use: { baseURL: `http://localhost:${demoPort}` },
     },
     {
       name: "live-discovery",
       testDir: "tests/discovery-e2e",
-      use: { baseURL: "http://localhost:3101" },
+      use: { baseURL: `http://localhost:${livePort}` },
     },
   ],
   workers: 1,
   timeout: 60000,
   use: {
-    baseURL: "http://localhost:3100",
+    baseURL: `http://localhost:${demoPort}`,
     viewport: { width: 1440, height: 1000 },
     launchOptions: {
       executablePath:
@@ -29,8 +31,8 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "npm run start -- --port 3100",
-      url: "http://localhost:3100",
+      command: `npm run start -- --port ${demoPort}`,
+      url: `http://localhost:${demoPort}`,
       reuseExistingServer: false,
       env: {
         CONTENT_OS_MODE: "demo",
@@ -40,8 +42,8 @@ export default defineConfig({
       timeout: 60000,
     },
     {
-      command: "npm run start -- --port 3101",
-      url: "http://localhost:3101",
+      command: `npm run start -- --port ${livePort}`,
+      url: `http://localhost:${livePort}`,
       reuseExistingServer: false,
       env: {
         CONTENT_OS_MODE: "demo",

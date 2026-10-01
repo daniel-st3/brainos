@@ -51,7 +51,9 @@ test("live brief: evidence, fail-closed workflow, pilot actions and a manual mis
   expect(stories[0].status).toBe("detected");
   expect(stories[0].assets[0].publishable).toBe(false);
   const shortcut = await request.post("/api/commands", {
-    headers: { Origin: "http://localhost:3101" },
+    headers: {
+      Origin: `http://localhost:${Number(process.env.E2E_PORT_BASE ?? 3100) + 1}`,
+    },
     data: {
       storyId: stories[0].id,
       expectedVersion: stories[0].version,
@@ -169,7 +171,9 @@ test("ten-day pilot records daily comparisons, rejects shortcuts, and exports ob
   };
   const future = await request.post("/api/pilot/study", {
     data: payload,
-    headers: { Origin: "http://localhost:3101" },
+    headers: {
+      Origin: `http://localhost:${Number(process.env.E2E_PORT_BASE ?? 3100) + 1}`,
+    },
   });
   expect(future.status()).toBe(422);
   expect((await future.json()).error).toContain("Future");

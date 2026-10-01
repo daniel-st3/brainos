@@ -7,6 +7,7 @@ export function approvedProductionPacket(story: Story, draftId: string) {
   const issues = approvalIssues(story, d);
   if (issues.length) throw new Error(issues.join(" "));
   return {
+    language: d.language,
     story_id: story.id,
     draft_id: d.id,
     revision: d.revision,
@@ -27,6 +28,17 @@ export function approvedProductionPacket(story: Story, draftId: string) {
       "Only cleared assets used",
     ],
     source_urls: story.sources.map((s) => s.canonical_url),
+    evidence_reminders: story.evidence
+      .filter((e) => d.claim_ids.includes(e.claim_id))
+      .map((e) => ({
+        claim_id: e.claim_id,
+        source_id: e.source_id,
+        excerpt: e.excerpt,
+        locator: e.locator,
+      })),
+    screenshot_requirements: d.shot_notes
+      .split(/\n/)
+      .filter((line) => /screen|captura|demo|pantalla/i.test(line)),
   };
 }
 const escape = (s: string) =>
@@ -55,9 +67,7 @@ export interface PostRecordingRequest {
   language: string;
 }
 export interface PostRecordingProvider {
-  transcribe(
-    input: PostRecordingRequest,
-  ): Promise<{
+  transcribe(input: PostRecordingRequest): Promise<{
     segments: { start: number; end: number; text: string }[];
     provider: string;
   }>;
