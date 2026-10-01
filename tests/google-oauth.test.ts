@@ -30,7 +30,8 @@ beforeEach(() => {
   vi.stubEnv("CONTENT_OS_ORIGIN", "https://newsroom.example");
   vi.stubEnv("GOOGLE_CLIENT_ID", "test-client");
   vi.stubEnv("GOOGLE_CLIENT_SECRET", "test-secret");
-  vi.stubEnv("GOOGLE_DRIVE_ROOT_ID", "existing-test-root");
+  vi.stubEnv("GOOGLE_DRIVE_ROOT_ID", "1ioH_s2oxNZni7OwG54TScSxSaC33zIje");
+  vi.stubEnv("GOOGLE_DRIVE_ACCOUNT_EMAIL", "Danix3102@gmail.com");
 });
 afterEach(() => vi.unstubAllEnvs());
 describe("Google runtime OAuth", () => {

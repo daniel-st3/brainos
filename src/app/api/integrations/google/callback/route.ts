@@ -1,3 +1,4 @@
+import { verifyPersonalDrive } from "@/integrations/personal-drive";
 import { NextResponse, type NextRequest } from "next/server";
 import { editor } from "@/server/auth";
 import { applicationRpc } from "@/ingestion/store";
@@ -46,29 +47,7 @@ export async function GET(request: NextRequest) {
       !token.scope?.split(" ").includes(googleDriveScope)
     )
       throw new Error("Offline Drive consent was not granted.");
-    const root = process.env.GOOGLE_DRIVE_ROOT_ID!;
-    const folder = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(root)}?fields=id,mimeType,capabilities(canAddChildren)`,
-      {
-        headers: { Authorization: `Bearer ${token.access_token}` },
-        signal: AbortSignal.timeout(15000),
-      },
-    );
-    if (!folder.ok)
-      throw new Error(
-        "The authorized Google account cannot access the existing BrainOS root folder.",
-      );
-    const metadata = (await folder.json()) as {
-      mimeType: string;
-      capabilities?: { canAddChildren?: boolean };
-    };
-    if (
-      metadata.mimeType !== "application/vnd.google-apps.folder" ||
-      !metadata.capabilities?.canAddChildren
-    )
-      throw new Error(
-        "The authorized account cannot upload into the BrainOS root folder.",
-      );
+    await verifyPersonalDrive(token.access_token);
     await (
       await applicationRpc()
     )("save_google_connection", {
@@ -77,7 +56,7 @@ export async function GET(request: NextRequest) {
       p_actor: actor,
     });
     response = NextResponse.redirect(
-      new URL("/production?google=connected", config.origin),
+      new URL("/production/studio?google=connected", config.origin),
     );
   } catch (e) {
     response = NextResponse.json(

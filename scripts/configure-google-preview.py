@@ -6,7 +6,7 @@ from pathlib import Path
 ORIGIN = "https://brainos-daniel-st3s-projects.vercel.app"
 PROJECT = "prj_UnhfdSb5poFegUtiMf7Vl6YI5kVb"
 TEAM = "team_5avUXFThVjAwm3IsDhzQoSlZ"
-ROOT = "14h6iv1SXu7eNSrSC2WpVbXrfgZqJ6xYu"
+ROOT = "1ioH_s2oxNZni7OwG54TScSxSaC33zIje"
 
 
 def dotenv(path):
@@ -52,6 +52,7 @@ def main():
         "GOOGLE_CLIENT_ID": client["client_id"],
         "GOOGLE_CLIENT_SECRET": client["client_secret"],
         "GOOGLE_DRIVE_ROOT_ID": ROOT,
+        "GOOGLE_DRIVE_ACCOUNT_EMAIL": "Danix3102@gmail.com",
         "CONTENT_OS_ORIGIN": ORIGIN,
         "GMAIL_INTAKE_ENABLED": "false",
     }

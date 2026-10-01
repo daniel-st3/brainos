@@ -31,7 +31,9 @@ Explicit opinion memory: authenticated same-origin `POST /api/operations` with `
 ## Media and production
 
 Drive root created and read back through the connector:
-`14h6iv1SXu7eNSrSC2WpVbXrfgZqJ6xYu` — Daniel AI Content OS.
+`1ioH_s2oxNZni7OwG54TScSxSaC33zIje` — personal Daniel AI Content OS, owned by `Danix3102@gmail.com`.
+
+`GOOGLE_DRIVE_ACCOUNT_EMAIL=Danix3102@gmail.com` is required. Runtime authorization verifies this account before accessing the root, and rejects non-owned folders and media outside its descendants.
 Children: Inbox, Stories, Recordings, Assets, Exports, Published, Archive.
 
 Runtime Drive upload requires a dedicated Google OAuth web client configured with the exact redirect URI `${CONTENT_OS_ORIGIN}/api/integrations/google/callback`. The editor opens `${CONTENT_OS_ORIGIN}/api/integrations/google/start`. The callback uses PKCE, encrypted expiring state bound to the editor, a Secure/HttpOnly/SameSite cookie, and an authenticated session. It verifies write access to the **existing** root folder before storing the refresh token with AES-256-GCM in the private `runtime_connections` table. `INTEGRATION_ENCRYPTION_KEY` is a random 32-byte runtime secret, stored separately from the database. Do not rotate it without re-encrypting existing credentials or reauthorizing.

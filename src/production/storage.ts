@@ -1,3 +1,4 @@
+import { personalDriveConfiguration } from "../integrations/personal-drive";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import { storageClient, driveToken } from "../integrations/media";
@@ -99,8 +100,7 @@ export async function driveInfo(fileId: string) {
   };
   const file = await get(fileId);
   if (file.trashed) throw Error("Drive file is trashed");
-  const root = process.env.GOOGLE_DRIVE_ROOT_ID;
-  if (!root) throw Error("Existing Drive root is not configured");
+  const { root } = personalDriveConfiguration();
   let parents = file.parents ?? [],
     inside = false;
   for (let depth = 0; depth < 12 && parents.length; depth++) {

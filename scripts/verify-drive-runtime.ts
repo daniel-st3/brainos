@@ -2,7 +2,7 @@
 import { driveToken } from "../src/integrations/media";
 import { driveInfo } from "../src/production/storage";
 const root = process.env.GOOGLE_DRIVE_ROOT_ID;
-if (root !== "14h6iv1SXu7eNSrSC2WpVbXrfgZqJ6xYu")
+if (root !== "1ioH_s2oxNZni7OwG54TScSxSaC33zIje")
   throw Error("Expected existing Daniel AI Content OS root");
 const token = await driveToken();
 const headers = { Authorization: `Bearer ${token}` };

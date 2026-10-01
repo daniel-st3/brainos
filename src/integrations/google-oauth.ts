@@ -1,3 +1,4 @@
+import { personalDriveConfiguration } from "./personal-drive";
 import {
   createCipheriv,
   createDecipheriv,
@@ -60,6 +61,7 @@ export function oauthConfiguration() {
   if (parsed.protocol !== "https:" || parsed.origin !== origin)
     throw new Error("OAuth origin must be an exact HTTPS origin.");
   key();
+  personalDriveConfiguration();
   return {
     origin,
     clientId,
@@ -82,7 +84,8 @@ export function createConsent(actor: string, now = Date.now()) {
     response_type: "code",
     scope: googleDriveScope,
     access_type: "offline",
-    prompt: "consent",
+    prompt: "consent select_account",
+    login_hint: personalDriveConfiguration().email,
     state,
     code_challenge: createHash("sha256").update(verifier).digest("base64url"),
     code_challenge_method: "S256",

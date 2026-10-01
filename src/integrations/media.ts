@@ -1,3 +1,7 @@
+import {
+  personalDriveConfiguration,
+  verifyPersonalDrive,
+} from "./personal-drive";
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import type { Rpc } from "../ingestion/store";
@@ -68,6 +72,7 @@ export async function storeArtifact(
   return { id, provider: "supabase", bucket, fileId: path, publishable: false };
 }
 export async function driveToken() {
+  personalDriveConfiguration();
   const clientId = process.env.GOOGLE_CLIENT_ID,
     clientSecret = process.env.GOOGLE_CLIENT_SECRET,
     configuredRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
@@ -99,6 +104,7 @@ export async function driveToken() {
     throw new Error(`Google token refresh failed (${response.status}).`);
   const result = (await response.json()) as { access_token?: string };
   if (!result.access_token) throw new Error("Google access token missing.");
+  await verifyPersonalDrive(result.access_token);
   return result.access_token;
 }
 export async function uploadOwnedMedia(
@@ -114,8 +120,7 @@ export async function uploadOwnedMedia(
 ) {
   if (input.ownedConfirmed !== true)
     throw new Error("Explicit owned-media confirmation required.");
-  const root = process.env.GOOGLE_DRIVE_ROOT_ID;
-  if (!root) throw new Error("Drive root folder ID required.");
+  const { root } = personalDriveConfiguration();
   if (input.bytes.length > 10_000_000)
     throw new Error(
       "Use Drive directly for large raw recordings; register their file IDs.",
