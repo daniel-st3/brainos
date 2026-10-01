@@ -1890,3 +1890,9 @@ td:first-child {
 .discovery-actions {display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;align-items:flex-start;}
 .brief-card-top {flex-wrap:wrap;}
 .brief-card h2,.source-panel h3 {overflow-wrap:anywhere;}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 16px;
+}

@@ -42,6 +42,59 @@ export const sourceDefinitions: SourceDefinition[] = [
     "microsoft/semantic-kernel",
     ["semantic-kernel"],
   ),
+  release("google-adk", "Google · Agent Development Kit", "google/adk-python", [
+    "google-adk",
+  ]),
+  {
+    ...release(
+      "llama-stack",
+      "Llama Stack · Project releases",
+      "llamastack/llama-stack",
+      ["llama-stack"],
+    ),
+    active: false,
+    reliability:
+      "The feed now points to ogx-ai/ogx, outside its registered publisher scope. Inactive pending maintainer review; no evidence was ingested.",
+  },
+  release("langgraph", "LangChain · LangGraph", "langchain-ai/langgraph", [
+    "langgraph",
+  ]),
+  release("vllm", "vLLM · Inference engine", "vllm-project/vllm", ["vllm"]),
+  {
+    ...release("n8n", "n8n · Workflow automation", "n8n-io/n8n", ["n8n"]),
+    // These moving pointers duplicate the versioned releases in the same feed.
+    ignoredReleaseTags: ["v1", "stable", "beta"],
+  },
+  {
+    id: "huggingface-blog",
+    name: "Hugging Face · Blog",
+    endpoint: "https://huggingface.co/blog/feed.xml",
+    tier: 0,
+    type: "official_blog",
+    adapter: "feed",
+    active: false,
+    reliability:
+      "Official blog candidate. Network access was blocked here; feed contents have not been verified.",
+    topics: ["models", "research", "open source"],
+    entities: ["huggingface"],
+    primaryPrefixes: ["https://huggingface.co/blog/"],
+    itemPrefixes: ["https://huggingface.co/blog/"],
+  },
+  {
+    id: "deepmind-blog",
+    name: "Google DeepMind · Blog",
+    endpoint: "https://deepmind.google/blog/rss.xml",
+    tier: 0,
+    type: "official_blog",
+    adapter: "feed",
+    active: false,
+    reliability:
+      "Official blog candidate. Network access was blocked here; endpoint and contents remain unverified.",
+    topics: ["models", "research"],
+    entities: ["deepmind"],
+    primaryPrefixes: ["https://deepmind.google/blog/"],
+    itemPrefixes: ["https://deepmind.google/blog/"],
+  },
   {
     id: "openai-news",
     name: "OpenAI · Newsroom",
@@ -56,6 +109,21 @@ export const sourceDefinitions: SourceDefinition[] = [
     entities: ["openai"],
     primaryPrefixes: ["https://openai.com/index/"],
     itemPrefixes: ["https://openai.com/"],
+  },
+  {
+    id: "arxiv-ai",
+    name: "arXiv · Artificial Intelligence",
+    endpoint: "https://rss.arxiv.org/rss/cs.AI",
+    tier: 0,
+    type: "research_feed",
+    adapter: "feed",
+    active: false,
+    reliability:
+      "Author-supplied preprints, not peer-reviewed findings. Network access was blocked here; feed contents remain unverified.",
+    topics: ["research", "preprints"],
+    entities: [],
+    primaryPrefixes: ["https://arxiv.org/abs/"],
+    itemPrefixes: ["https://arxiv.org/abs/", "http://arxiv.org/abs/"],
   },
   {
     id: "google-ai",

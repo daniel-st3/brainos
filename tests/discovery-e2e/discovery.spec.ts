@@ -116,3 +116,72 @@ test("live routes fit mobile and report source failures without runtime errors",
     ).toBe(true);
   }
 });
+
+test("ten-day pilot records daily comparisons, rejects shortcuts, and exports observations", async ({
+  page,
+  request,
+}) => {
+  const { bogotaDate, addDays } = await import("../../src/domain/pilot");
+  const { readFile } = await import("node:fs/promises");
+  const today = bogotaDate();
+  await page.goto("/pilot");
+  await page.getByLabel("First day").fill(today);
+  await page
+    .getByRole("button", { name: "Start ten-day pilot", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "0 of 10 daily comparisons recorded" }),
+  ).toBeVisible();
+  await page.getByLabel("Brief review minutes").fill("8");
+  await page.getByLabel("Manual browsing minutes").fill("20");
+  await page.getByLabel("Manual candidates checked").fill("10");
+  await page.getByLabel("Useful manual stories").fill("2");
+  await page.getByLabel("Useful brief stories").fill("3");
+  await page.getByLabel("Which was more useful?").selectOption("system_better");
+  await page
+    .getByLabel("What worked or was missed?")
+    .fill("TEST: primary sources made the brief easier to review.");
+  await page.getByRole("button", { name: "Save day 1", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "1 of 10 daily comparisons recorded" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Brief review minutes")).toHaveValue("8");
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("link", { name: "Export pilot JSON" }).click(),
+  ]);
+  const exported = JSON.parse(await readFile((await download.path())!, "utf8"));
+  expect(exported.timezone).toBe("America/Bogota");
+  expect(exported.study.days).toHaveLength(1);
+  expect(exported.events.length).toBeGreaterThan(0);
+  expect(exported.stories.length).toBeGreaterThan(0);
+  const payload = {
+    action: "save_day",
+    day: addDays(today, 1),
+    brief_minutes: 8,
+    manual_minutes: 20,
+    manual_candidates: 10,
+    manual_useful: 2,
+    brief_useful: 3,
+    verdict: "system_better",
+    notes: "",
+  };
+  const future = await request.post("/api/pilot/study", {
+    data: payload,
+    headers: { Origin: "http://localhost:3101" },
+  });
+  expect(future.status()).toBe(422);
+  expect((await future.json()).error).toContain("Future");
+  const cross = await request.post("/api/pilot/study", {
+    data: payload,
+    headers: { Origin: "https://untrusted.example" },
+  });
+  expect(cross.status()).toBe(403);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});

@@ -27,6 +27,15 @@ export function matchStory(
   stories: Story[],
 ): { story?: Story; reason: string } {
   const live = stories.filter((s) => !s.is_demo);
+  // An article's own identity outranks other announcements that it cites.
+  const exact = live.filter((s) =>
+    s.sources.some(
+      (source) => canonicalize(source.canonical_url) === item.canonicalUrl,
+    ),
+  );
+  if (exact.length === 1) return { story: exact[0], reason: "canonical URL" };
+  if (exact.length > 1)
+    return { reason: "ambiguous canonical URL; automatic merge withheld" };
   const urls = new Set([item.canonicalUrl, ...item.primaryReferences]);
   const direct = live.filter(
     (s) =>
@@ -37,11 +46,7 @@ export function matchStory(
   if (direct.length === 1)
     return {
       story: direct[0],
-      reason: direct[0].sources.some(
-        (s) => canonicalize(s.canonical_url) === item.canonicalUrl,
-      )
-        ? "canonical URL"
-        : "referenced primary evidence",
+      reason: "referenced primary evidence",
     };
   if (direct.length > 1)
     return { reason: "ambiguous primary references; automatic merge withheld" };

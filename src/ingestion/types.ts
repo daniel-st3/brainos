@@ -7,6 +7,7 @@ export interface SourceDefinition {
   type:
     | "official_release"
     | "official_blog"
+    | "research_feed"
     | "journalism"
     | "community"
     | "manual";
@@ -17,6 +18,7 @@ export interface SourceDefinition {
   entities: string[];
   primaryPrefixes: string[];
   itemPrefixes: string[];
+  ignoredReleaseTags?: string[];
 }
 export interface RegistryEntry {
   id: string;
@@ -56,6 +58,7 @@ export interface ScoreDimension {
   reasons: string[];
 }
 export interface DiscoveryInsights {
+  latest_source_ids?: Record<string, string>;
   source_times?: Record<
     string,
     {

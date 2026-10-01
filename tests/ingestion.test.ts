@@ -148,6 +148,71 @@ describe("deterministic clustering and provenance", () => {
     expect(b.story.assets).toHaveLength(1);
     expect(b.story.assets[0].publishable).toBe(false);
   });
+  it("keeps an existing roundup on its own story when it references multiple announcements", async () => {
+    const a = (await accumulate(undefined, item(), primary, "new", now)).story;
+    const b = (
+      await accumulate(
+        undefined,
+        item(
+          primary,
+          "https://official.example/news/second",
+          "Another announcement",
+        ),
+        primary,
+        "new",
+        now,
+      )
+    ).story;
+    const roundup = report();
+    roundup.primaryReferences.push(b.sources[0].canonical_url);
+    const own = (
+      await accumulate(
+        undefined,
+        roundup,
+        secondary,
+        "ambiguous references",
+        now,
+      )
+    ).story;
+    expect(matchStory(roundup, [a, b, own]).story?.id).toBe(own.id);
+  });
+  it("does not invalidate reconfirmed research for a timestamp-only refresh after a correction", async () => {
+    const a = (await accumulate(undefined, item(), primary, "new", now)).story;
+    const correction = item(primary, item().originalUrl, "Corrected statement");
+    const b = (
+      await accumulate(
+        a,
+        correction,
+        primary,
+        "correction",
+        "2026-10-01T02:00:00Z",
+      )
+    ).story;
+    b.research_confirmed = true;
+    b.discovery!.needs_review = false;
+    const refreshed = makeDiscovery(
+      primary,
+      {
+        id: correction.externalId,
+        url: correction.originalUrl,
+        title: "Product 4.2 new API release",
+        body: correction.excerpt,
+        published: "2026-09-30T12:30:00Z",
+        updated: "2026-10-01T03:00:00Z",
+      },
+      "2026-10-01T04:00:00Z",
+    );
+    const c = await accumulate(
+      b,
+      refreshed,
+      primary,
+      "feed refresh",
+      "2026-10-01T04:00:00Z",
+    );
+    expect(c.changed).toBe(false);
+    expect(c.story.research_confirmed).toBe(true);
+    expect(c.story.discovery?.needs_review).toBe(false);
+  });
   it("matches exact canonical URLs after tracking normalization", async () => {
     const a = await accumulate(undefined, item(), primary, "new", now);
     expect(
@@ -402,4 +467,82 @@ describe("durable ingestion and workflow isolation", () => {
       ),
     ).toBe(true);
   });
+});
+
+it("refetches a cached 304 feed when a secondary discovery needs unseen primary evidence", async () => {
+  const fresh = await initializeDb();
+  try {
+    const isolated = new DatabaseIngestionStore(localRpc(fresh));
+    const p = { ...primary, id: "first-primary" },
+      s = { ...secondary, id: "second-secondary" };
+    let primaryFetches = 0;
+    const adapter: SourceAdapter = {
+      fetch: async (source) => {
+        if (source.id === p.id) {
+          primaryFetches++;
+          if (primaryFetches === 1)
+            return { items: [], fetchedCount: 0, notModified: true };
+          return { items: [item(p)], fetchedCount: 1 };
+        }
+        const discovery = item(
+          s,
+          "https://journal.example/report",
+          '<a href="https://official.example/news/launch">Original announcement</a>',
+        );
+        return { items: [discovery], fetchedCount: 1 };
+      },
+    };
+    const runs = await runIngestion(isolated, {
+      registry: [p, s],
+      adapters: { feed: adapter },
+      now,
+    });
+    expect(runs.every((r) => r.status === "success")).toBe(true);
+    expect(primaryFetches).toBe(2);
+    const stories = await isolated.readStories();
+    expect(stories).toHaveLength(1);
+    expect(stories[0].sources).toHaveLength(2);
+    expect(stories[0].discovery?.primary_evidence_status).toBe("retrieved");
+    await expect(
+      runIngestion(isolated, {
+        registry: [p, s],
+        sourceIds: ["typo"],
+        adapters: { feed: adapter },
+        now,
+      }),
+    ).rejects.toThrow("Unknown");
+  } finally {
+    await fresh.close();
+  }
+});
+
+it("skips configured moving release pointers while retaining versioned announcements", async () => {
+  const fresh = await initializeDb();
+  try {
+    const isolated = new DatabaseIngestionStore(localRpc(fresh));
+    const source = sourceDefinitions.find((s) => s.id === "n8n")!;
+    const items = ["stable", "beta", "v1", "n8n@2.42.1"].map((tag) =>
+      makeDiscovery(
+        source,
+        {
+          id: tag,
+          url: `https://github.com/n8n-io/n8n/releases/tag/${encodeURIComponent(tag)}`,
+          title: tag,
+          body: "Fixture release",
+          updated: now,
+        },
+        now,
+      ),
+    );
+    const runs = await runIngestion(isolated, {
+      registry: [source],
+      now,
+      adapters: { feed: { fetch: async () => ({ items, fetchedCount: 4 }) } },
+    });
+    expect(runs[0].skipped_items).toBe(3);
+    expect(runs[0].new_stories).toBe(1);
+    expect((await isolated.readStories())[0].title).toContain("2.42.1");
+  } finally {
+    await fresh.close();
+  }
 });

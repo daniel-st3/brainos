@@ -31,13 +31,19 @@ export function newStory(
     summary: item.excerpt.slice(0, 600),
     status: "detected",
     pillar:
-      source.type === "official_release"
-        ? "AI in practice"
-        : /pric|enterprise|business/i.test(item.title)
-          ? "AI for business"
-          : "Tools, tested",
+      source.type === "research_feed"
+        ? "Research to practice"
+        : source.type === "official_release"
+          ? "AI in practice"
+          : /pric|enterprise|business/i.test(item.title)
+            ? "AI for business"
+            : "Tools, tested",
     story_type:
-      source.type === "official_release" ? "Product release" : "AI news",
+      source.type === "research_feed"
+        ? "Research paper"
+        : source.type === "official_release"
+          ? "Product release"
+          : "AI news",
     primary_language: "es",
     discovered_at: now,
     published_at: item.publishedAt,
@@ -86,12 +92,20 @@ export async function accumulate(
     `source:${story.id}:${source.id}:${item.canonicalUrl}:${item.contentHash}`,
   );
   const duplicateSource = story.sources.some((s) => s.id === sourceId);
-  const changed = story.sources.some(
-    (s) =>
-      s.canonical_url === item.canonicalUrl &&
-      s.publisher === source.name &&
-      s.excerpt !== item.excerpt,
+  const sourceKey = `${source.id}:${item.canonicalUrl}`;
+  const previousSources = story.sources.filter(
+    (s) => s.canonical_url === item.canonicalUrl && s.publisher === source.name,
   );
+  const latest =
+    previousSources.find(
+      (s) => s.id === story.discovery?.latest_source_ids?.[sourceKey],
+    ) ??
+    previousSources.sort(
+      (a, b) => Date.parse(b.retrieved_at) - Date.parse(a.retrieved_at),
+    )[0];
+  const changed =
+    !!latest &&
+    (latest.excerpt !== item.excerpt || latest.title !== item.title);
   if (duplicateSource) return { story, sourceId, changed: false };
   const retrieved = source.adapter !== "manual";
   const evidence: Source = {
@@ -178,6 +192,7 @@ export async function accumulate(
   const score = scoreDiscovery(item, source, now);
   story.discovery = {
     ...previous,
+    latest_source_ids: { ...previous.latest_source_ids, [sourceKey]: sourceId },
     source_times: {
       ...previous.source_times,
       [sourceId]: {
@@ -351,6 +366,12 @@ export async function runIngestion(
     now = options.now ?? new Date().toISOString(),
     owner = crypto.randomUUID();
   await store.ensureSources(registry);
+  if (
+    options.sourceIds?.some(
+      (id) => !registry.some((s) => s.id === id && s.adapter !== "manual"),
+    )
+  )
+    throw new Error("Unknown or non-fetchable source ID.");
   if (!(await store.lease(owner)))
     throw new Error("An ingestion cycle is already running.");
   const completed: IngestionRun[] = [];
@@ -407,6 +428,15 @@ export async function runIngestion(
         run.items_fetched = fetched.fetchedCount;
         let processed = 0;
         for (const incoming of fetched.items) {
+          const releaseTag = decodeURIComponent(
+            new URL(incoming.canonicalUrl).pathname.split(
+              "/releases/tag/",
+            )[1] ?? "",
+          );
+          if (source.ignoredReleaseTags?.includes(releaseTag)) {
+            run.skipped_items++;
+            continue;
+          }
           const item = {
             ...incoming,
             primaryReferences: primaryReferences(incoming, registry),
@@ -457,7 +487,7 @@ export async function runIngestion(
                 if (!primary) continue;
                 try {
                   let primaryFeed = cache.get(primary.id);
-                  if (!primaryFeed) {
+                  if (!primaryFeed || primaryFeed.notModified) {
                     primaryFeed = await sourceAdapters[primary.adapter].fetch(
                       primary,
                       { now },

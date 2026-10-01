@@ -1,12 +1,20 @@
 import Link from "next/link";
+import { PilotStudyPanel } from "@/components/pilot-study";
+import { eventsInPilot, type PilotStudy } from "@/domain/pilot";
+import { dataMode } from "@/server/mode";
 import { newsroom } from "@/server/data";
 import { ingestionStore } from "@/ingestion/store";
 import { PageHeader, DateText, Empty } from "@/components/ui";
 export default async function Pilot() {
   const stories = await newsroom();
-  const state = await (await ingestionStore()).state();
+  const store = await ingestionStore();
+  const state = await store.state();
+  const study = (await store.rpc("read_pilot_study")) as PilotStudy;
+  const observations = study.config
+    ? eventsInPilot(state.pilot, study.config.starts_on)
+    : state.pilot;
   const rows = stories.filter((s) =>
-    state.pilot.some((e) => e.story_id === s.id),
+    observations.some((e) => e.story_id === s.id),
   );
   return (
     <>
@@ -15,6 +23,15 @@ export default async function Pilot() {
         title="Was the brief useful?"
         description="A minimal observation log: what was visible, opened, saved, dismissed or turned into a draft. No audience analytics."
       />
+      <PilotStudyPanel
+        study={study}
+        events={observations}
+        live={dataMode() === "live"}
+      />
+      <h2 style={{ marginTop: 32 }}>
+        Story observations
+        {study.config ? " · pilot window" : " · before starting"}
+      </h2>
       <p className="subtle">
         Impressions are recorded when a brief card enters the viewport, not on
         background prefetch. Missing observations are not proof that a story was
@@ -37,7 +54,7 @@ export default async function Pilot() {
           </thead>
           <tbody>
             {rows.map((s) => {
-              const events = state.pilot.filter((e) => e.story_id === s.id);
+              const events = observations.filter((e) => e.story_id === s.id);
               const first = events
                 .filter((e) => e.kind === "surfaced")
                 .sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
