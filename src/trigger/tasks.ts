@@ -1,4 +1,4 @@
-import { task, schedules } from "@trigger.dev/sdk";
+import { task } from "@trigger.dev/sdk";
 import { ingestionStore } from "../ingestion/store";
 import { runIngestion } from "../ingestion/pipeline";
 import { enqueueEditorialWork, runOperations } from "../operations/worker";
@@ -38,15 +38,10 @@ export const ingestStories = task({
   retry: { maxAttempts: 2, minTimeoutInMs: 10000, maxTimeoutInMs: 30000 },
   run: async (payload: { sourceIds?: string[] }) => ingest(payload.sourceIds),
 });
-// Activated only after deployment to a configured Trigger project. Per-source
-// transport retries and failure isolation live in the shared pipeline.
-export const morningDiscovery = schedules.task({
+// GitHub Actions is the sole recurring scheduler. Retain this manual task for
+// debugging with an existing Trigger project; it registers no second cron.
+export const morningDiscovery = task({
   id: "morning-discovery",
-  cron: {
-    pattern: "30 6 * * *",
-    timezone: "America/Bogota",
-    environments: ["PRODUCTION"],
-  },
   retry: { maxAttempts: 2, minTimeoutInMs: 10000, maxTimeoutInMs: 30000 },
   run: async () => ingest(),
 });
