@@ -70,7 +70,17 @@ export async function storeArtifact(
 export async function driveToken() {
   const clientId = process.env.GOOGLE_CLIENT_ID,
     clientSecret = process.env.GOOGLE_CLIENT_SECRET,
-    refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+    configuredRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+  let refreshToken = configuredRefreshToken;
+  if (!refreshToken && process.env.CONTENT_OS_MODE === "supabase") {
+    const { applicationRpc } = await import("../ingestion/store");
+    const { openSecret } = await import("./google-oauth");
+    const connection = (await (
+      await applicationRpc()
+    )("read_google_connection")) as { encrypted_refresh_token: string } | null;
+    if (connection)
+      refreshToken = openSecret(connection.encrypted_refresh_token, "refresh");
+  }
   if (!clientId || !clientSecret || !refreshToken)
     throw new Error(
       "Google runtime OAuth authorization required; Codex connector access is separate.",
