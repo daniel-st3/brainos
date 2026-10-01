@@ -1,4 +1,7 @@
-import { verifyPersonalDrive } from "@/integrations/personal-drive";
+import {
+  DriveVerificationError,
+  verifyPersonalDrive,
+} from "@/integrations/personal-drive";
 import { NextResponse, type NextRequest } from "next/server";
 import { editor } from "@/server/auth";
 import { applicationRpc } from "@/ingestion/store";
@@ -47,7 +50,7 @@ export async function GET(request: NextRequest) {
       !token.scope?.split(" ").includes(googleDriveScope)
     )
       throw new Error("Offline Drive consent was not granted.");
-    await verifyPersonalDrive(token.access_token);
+    const verified = await verifyPersonalDrive(token.access_token, true);
     await (
       await applicationRpc()
     )("save_google_connection", {
@@ -55,13 +58,22 @@ export async function GET(request: NextRequest) {
       p_scopes: token.scope.split(" "),
       p_actor: actor,
     });
+    console.info("BrainOS Drive verified", {
+      email: verified.email,
+      root: verified.root,
+      folderGet: 200,
+      childrenList: 200,
+    });
     response = NextResponse.redirect(
       new URL("/production/studio?google=connected", config.origin),
     );
   } catch (e) {
+    if (e instanceof DriveVerificationError)
+      console.error("BrainOS Drive verification failed", e.diagnostic);
     response = NextResponse.json(
       {
         error: e instanceof Error ? e.message : "Google authorization failed.",
+        ...(e instanceof DriveVerificationError ? { drive: e.diagnostic } : {}),
       },
       {
         status: e instanceof Error && e.message === "Unauthorized" ? 401 : 422,

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
+  DriveVerificationError,
   personalDriveRoot,
   personalDriveEmail,
   verifyPersonalDrive,
@@ -42,7 +43,7 @@ it("rejects the wrong Google account before accessing any folder", async () => {
   expect(call).toHaveBeenCalledTimes(1);
   expect(call.mock.calls[0][0]).toContain("/about?");
 });
-it("requires personal ownership of the exact root, not merely shared write access", async () => {
+it("accepts shared write access to the exact root without ownership", async () => {
   const call = vi
     .fn()
     .mockResolvedValueOnce(
@@ -50,9 +51,9 @@ it("requires personal ownership of the exact root, not merely shared write acces
     )
     .mockResolvedValueOnce(Response.json({ ...folder(), ownedByMe: false }));
   vi.stubGlobal("fetch", call);
-  await expect(verifyPersonalDrive("test")).rejects.toThrow(
-    "owned by the personal",
-  );
+  await expect(verifyPersonalDrive("test")).resolves.toMatchObject({
+    root: personalDriveRoot,
+  });
 });
 it("accepts personal identity and exact writable root", async () => {
   const call = vi
@@ -99,3 +100,74 @@ it("rejects linking media outside the personal root before download", async () =
     call.mock.calls.every((c) => !String(c[0]).includes("alt=media")),
   ).toBe(true);
 });
+
+it("rejects a read-only folder even if personally owned", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ user: { emailAddress: personalDriveEmail } }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ ...folder(), capabilities: { canAddChildren: false } }),
+      ),
+  );
+  await expect(verifyPersonalDrive("test")).rejects.toThrow("write access");
+});
+it("lists only the exact root's children during consent verification", async () => {
+  const call = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json({ user: { emailAddress: personalDriveEmail } }),
+    )
+    .mockResolvedValueOnce(Response.json(folder()))
+    .mockResolvedValueOnce(Response.json({ files: [] }));
+  vi.stubGlobal("fetch", call);
+  await verifyPersonalDrive("test", true);
+  expect(new URL(call.mock.calls[2][0]).searchParams.get("q")).toBe(
+    `'${personalDriveRoot}' in parents and trashed = false`,
+  );
+  expect(
+    call.mock.calls.every(
+      ([, options]) => !options.method && options.cache === "no-store",
+    ),
+  ).toBe(true);
+});
+it.each(["files.get", "files.list"])(
+  "preserves the exact %s failure without credentials",
+  async (operation) => {
+    const call = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ user: { emailAddress: personalDriveEmail } }),
+      );
+    if (operation === "files.list")
+      call.mockResolvedValueOnce(Response.json(folder()));
+    const body = {
+      error: {
+        code: 404,
+        message: "File not found",
+        errors: [{ reason: "notFound", domain: "global" }],
+      },
+    };
+    call.mockResolvedValueOnce(Response.json(body, { status: 404 }));
+    vi.stubGlobal("fetch", call);
+    try {
+      await verifyPersonalDrive("secret-access-token", true);
+      throw Error("Expected failure");
+    } catch (e) {
+      expect(e).toBeInstanceOf(DriveVerificationError);
+      const d = (e as DriveVerificationError).diagnostic;
+      expect(d).toMatchObject({
+        call: operation,
+        method: "GET",
+        status: 404,
+        response: body,
+        verifiedAccount: personalDriveEmail,
+      });
+      expect(d.url).toContain(personalDriveRoot);
+      expect(JSON.stringify(d)).not.toContain("secret-access-token");
+    }
+  },
+);

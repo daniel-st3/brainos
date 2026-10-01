@@ -53,4 +53,9 @@ References: [Google web-server OAuth](https://developers.google.com/identity/pro
 
 ## Personal-only enforcement
 
-The only permitted Google account is **Danix3102@gmail.com** and the only root is the personal folder above. OAuth callback and every refreshed Drive token verify the account before accessing a folder, then require personal ownership and write access. All linked media must descend from that root. A wrong account or changed root fails closed. No work folder is used or modified.
+The only permitted Google account is **Danix3102@gmail.com** and the only root is the personal folder above. OAuth callback and every refreshed Drive token verify the account before accessing a folder, then require write access (`capabilities.canAddChildren`); ownership is not required. All linked media must descend from that root. A wrong account or changed root fails closed. No work folder is used or modified.
+
+
+### Read-only consent diagnostics
+
+The callback verifies `about.get` (personal email), `files.get` (exact root and `canAddChildren`), and `files.list` (children of that root only) before saving the encrypted refresh token. These checks do not create or modify Drive files. Google failures return the exact GET URL, HTTP status and Google error envelope in the authenticated callback response and runtime logs; OAuth codes, tokens and request headers are excluded. Successful checks log only the account/root and status. A failed callback does not retain a token, so another consent attempt is required after correcting configuration. Older callback versions discarded the underlying Google error response.
