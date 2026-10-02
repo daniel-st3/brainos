@@ -18,7 +18,8 @@ export async function syncSubscribers(rpc: Rpc, send: Transport = fetch) {
     send,
     true,
   );
-  const rows = (await rpc("read_subscribers")) as {
+  // The database prioritizes pending changes, then rotates successful remote checks.
+  const rows = (await rpc("read_subscriber_sync_batch")) as {
     id: string;
     email: string;
     status: string;
@@ -39,6 +40,9 @@ export async function syncSubscribers(rpc: Rpc, send: Transport = fetch) {
           await rpc("subscriber_remote_unsubscribe", { p_id: row.id });
           continue;
         }
+        if (!r.data.status)
+          throw new ProviderError("SUBSCRIBER_STATUS_MISSING");
+        await rpc("subscriber_sync_checked", { p_id: row.id });
       }
       if (row.sync_status === "synced" && row.status === "active") continue;
       const r = (await client.syncSubscriber(
@@ -47,10 +51,13 @@ export async function syncSubscribers(rpc: Rpc, send: Transport = fetch) {
         row.status === "active",
         row.beehiiv_id ?? undefined,
       )) as { data?: { id?: string } };
+      const externalId = r.data?.id ?? row.beehiiv_id;
+      if (!externalId) throw new ProviderError("SUBSCRIBER_ID_MISSING");
       await rpc("subscriber_sync_result", {
         p_id: row.id,
-        p_external: r.data?.id ?? row.beehiiv_id,
+        p_external: externalId,
         p_status: "synced",
+        p_expected_status: row.status,
       });
       processed++;
     } catch (e) {
@@ -58,6 +65,7 @@ export async function syncSubscribers(rpc: Rpc, send: Transport = fetch) {
         p_id: row.id,
         p_external: null,
         p_status: e instanceof ProviderError ? e.code : "SYNC_FAILED",
+        p_expected_status: row.status,
       });
     }
   }

@@ -19,11 +19,23 @@ import {
   startProviderAuth,
   selectProviderAccount,
   installBeehiiv,
+  installBuffer,
   disconnectProvider,
 } from "./auth";
 const id = z.uuid(),
   short = z.string().trim().min(1).max(200);
 export const activationCommand = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("buffer_key"),
+    key: z.string().min(10).max(1000),
+  }),
+  z.object({
+    action: z.literal("buffer_delivery"),
+    package_id: id,
+    mode: z.enum(["draft", "schedule", "queue", "now"]),
+    scheduled_at: z.iso.datetime().optional(),
+    confirmed: z.literal(true),
+  }),
   z.object({
     action: z.literal("auth_start"),
     provider: z.enum(platforms),
@@ -34,6 +46,12 @@ export const activationCommand = z.discriminatedUnion("action", [
     action: z.literal("beehiiv_key"),
     id,
     key: z.string().min(10).max(1000),
+  }),
+  z.object({
+    action: z.literal("distribution_authorize"),
+    id,
+    enabled: z.boolean(),
+    confirmed: z.literal(true),
   }),
   z.object({ action: z.literal("disconnect"), id, confirmed: z.literal(true) }),
   z.object({
@@ -119,10 +137,18 @@ export function profileDrift(
   actual?: Record<string, unknown>,
 ) {
   if (!actual) return { status: "UNKNOWN", fields: [] };
-  const fields = ["name", "handle", "bio"].filter(
+  const unavailableBio =
+    (actual.raw as Record<string, unknown> | undefined)
+      ?.profile_bio_available === false;
+  const fields = (
+    unavailableBio ? ["name", "handle"] : ["name", "handle", "bio"]
+  ).filter(
     (k) => String(desired[k] ?? "").trim() !== String(actual[k] ?? "").trim(),
   );
-  return { status: fields.length ? "DRIFT" : "MATCH", fields };
+  return {
+    status: fields.length ? "DRIFT" : unavailableBio ? "UNKNOWN" : "MATCH",
+    fields,
+  };
 }
 export async function activationState(rpc: Rpc, demo: boolean) {
   const { state: s, stories, production } = await controlSnapshot(rpc, demo);
@@ -140,7 +166,28 @@ export async function activationState(rpc: Rpc, demo: boolean) {
         : { ready: false, issues: ["Content selection required"] },
     };
   });
+  const distribution = (
+    (await rpc("read_provider_outbox", { p_demo: demo })) as {
+      id: string;
+      package_id: string;
+      provider: string;
+      status: string;
+      due_at: string;
+      remote: { status?: string; url?: string };
+      error?: string;
+    }[]
+  ).map((r) => ({
+    id: r.id,
+    package_id: r.package_id,
+    provider: r.provider,
+    status: r.status,
+    remote_status: r.remote?.status ?? null,
+    due_at: r.due_at,
+    url: r.remote?.url ?? null,
+    error: r.error ?? null,
+  }));
   return {
+    distribution,
     launch_slots,
     ...s,
     providers: platforms.map((p) => {
@@ -163,7 +210,12 @@ export async function activationState(rpc: Rpc, demo: boolean) {
         signup: definitions[p].signup,
         account: a ?? null,
         profile: profile ?? null,
-        engineering: ready ? "READY_FOR_AUTH" : "IMPLEMENTED_UNVERIFIED",
+        free_connector: ["instagram", "tiktok", "x"].includes(p),
+        transport: a?.data.delivery_transport ?? "native",
+        engineering:
+          ready || ["instagram", "tiktok", "x"].includes(p)
+            ? "READY_FOR_AUTH"
+            : "IMPLEMENTED_UNVERIFIED",
         app_configured: ready,
         drift: profileDrift(
           profile?.data ?? {},
@@ -171,13 +223,15 @@ export async function activationState(rpc: Rpc, demo: boolean) {
         ),
         capabilities: a?.data.capabilities ?? [],
         blocker:
-          p === "x"
-            ? "Paid API access; no spend authorized"
-            : p === "beehiiv"
-              ? "API key and eligible posts API access"
-              : !ready
-                ? "Developer application/client credentials missing"
-                : (a?.data.reason ?? "Create account and connect"),
+          a?.data.delivery_transport === "buffer"
+            ? (a.data.reason ?? "Buffer connected")
+            : p === "x"
+              ? "Paid API access; no spend authorized"
+              : p === "beehiiv"
+                ? "API key and eligible posts API access"
+                : !ready
+                  ? "Developer application/client credentials missing"
+                  : (a?.data.reason ?? "Create account and connect"),
       };
     }),
   };
@@ -189,6 +243,45 @@ export async function activationAction(
   demo: boolean,
 ) {
   const c = activationCommand.parse(raw);
+  if (c.action === "buffer_delivery") {
+    const { enqueueOutbox, processOutbox } = await import("./outbox");
+    const id = await enqueueOutbox(
+      rpc,
+      c.package_id,
+      new Date().toISOString(),
+      demo,
+      {
+        mode: c.mode,
+        ...(c.scheduled_at ? { scheduled_at: c.scheduled_at } : {}),
+      },
+    );
+    const { existingOutbox, manageDistribution } = await import("./management");
+    const existing = await existingOutbox(rpc, id, demo);
+    if (existing?.status === "draft" && c.mode !== "draft")
+      await manageDistribution(rpc, id, demo, actor, "release", {
+        mode: c.mode,
+        ...(c.scheduled_at ? { scheduled_at: c.scheduled_at } : {}),
+      });
+    else if (
+      existing?.payload.delivery &&
+      JSON.stringify(existing.payload.delivery) !==
+        JSON.stringify({
+          mode: c.mode,
+          ...(c.scheduled_at ? { scheduled_at: c.scheduled_at } : {}),
+        })
+    )
+      throw Error(
+        "This immutable publication request already has a different delivery authorization",
+      );
+    await processOutbox(rpc, demo);
+    const result = await existingOutbox(rpc, id, demo);
+    return {
+      id,
+      status: result?.status ?? "unknown",
+      remote_status: result?.remote.status ?? null,
+      result_url: result?.remote.url ?? null,
+    };
+  }
   if (c.action === "job_resolve") {
     await rpc("resolve_control_job", {
       p_id: c.id,
@@ -202,6 +295,11 @@ export async function activationAction(
     return exportCarouselDrive(rpc, c.id, demo);
   }
   if (c.action === "outbox_recover") {
+    if (c.operation === "cancel") {
+      const { manageDistribution } = await import("./management");
+      await manageDistribution(rpc, c.id, demo, actor, "cancel");
+      return {};
+    }
     await rpc("recover_provider_outbox", {
       p_id: c.id,
       p_action: c.operation,
@@ -215,6 +313,10 @@ export async function activationAction(
   if (c.action === "select") {
     await selectProviderAccount(rpc, c.id, c.external_id, actor);
     return {};
+  }
+  if (c.action === "buffer_key") {
+    if (demo) throw Error("Connect real accounts in the live workspace");
+    return installBuffer(rpc, c.key, actor);
   }
   if (c.action === "beehiiv_key") {
     await installBeehiiv(rpc, c.id, c.key, actor);
@@ -256,6 +358,27 @@ export async function activationAction(
     if (!e) throw Error("Record missing");
     return e;
   };
+  if (c.action === "distribution_authorize") {
+    const a = find(c.id, "account");
+    if (
+      c.enabled &&
+      (a.data.status !== "connected" ||
+        !(a.data.capabilities as string[]).includes("publish") ||
+        !a.data.external_id ||
+        !Number.isFinite(Date.parse(String(a.data.verified_at))))
+    )
+      throw Error("Verify a connected publish-capable account first");
+    add(
+      "account",
+      {
+        ...a.data,
+        writes_authorized: c.enabled,
+        writes_authorized_by: actor,
+        writes_authorized_at: new Date().toISOString(),
+      },
+      a,
+    );
+  }
   if (c.action === "handle")
     add(
       "handle",

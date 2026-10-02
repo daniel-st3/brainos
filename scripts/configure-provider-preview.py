@@ -16,7 +16,7 @@ def main():
     if args.file.stat().st_mode & 0o077:raise RuntimeError('Private file must have permission 600')
     fields=read_env(args.file)
     allowed={f'{p}_{suffix}' for p in ['INSTAGRAM','TIKTOK','X','YOUTUBE'] for suffix in ['CLIENT_ID','CLIENT_SECRET']}
-    allowed|={'TIKTOK_APP_AUDITED','YOUTUBE_PROJECT_AUDITED','BEEHIIV_POSTS_ACCESS_VERIFIED','PRODUCTION_WORKER_TOKEN','PRODUCTION_WORKER_TOKEN_PREVIOUS','PRODUCTION_WORKER_TOKEN_PREVIOUS_UNTIL','INTEGRATION_ENCRYPTION_KEY','INTEGRATION_ENCRYPTION_KEY_PREVIOUS'}
+    allowed|={'TIKTOK_VERIFIED_MEDIA_PREFIX','TIKTOK_APP_AUDITED','YOUTUBE_PROJECT_AUDITED','BEEHIIV_POSTS_ACCESS_VERIFIED','PRODUCTION_WORKER_TOKEN','PRODUCTION_WORKER_TOKEN_PREVIOUS','PRODUCTION_WORKER_TOKEN_PREVIOUS_UNTIL','INTEGRATION_ENCRYPTION_KEY','INTEGRATION_ENCRYPTION_KEY_PREVIOUS'}
     if not fields or set(fields)-allowed:raise RuntimeError('Unknown or empty configuration field; publication/spend flags cannot be enabled by this command')
     if any(not v for v in fields.values()):raise RuntimeError('Empty private configuration value')
     if 'INTEGRATION_ENCRYPTION_KEY' in fields:

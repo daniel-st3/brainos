@@ -95,6 +95,142 @@ function Form({
   );
 }
 
+type BufferMode = "draft" | "schedule" | "queue" | "now";
+type BufferDeliveryResult = { status?: string; remote_status?: string };
+const bufferChoices: Record<BufferMode, { label: string; consent: string }> = {
+  draft: { label: "Create Buffer draft", consent: "create a draft in Buffer" },
+  schedule: {
+    label: "Programar en BrainOS",
+    consent: "schedule this approved post in BrainOS for the selected time",
+  },
+  queue: {
+    label: "Cola de BrainOS (elige fecha)",
+    consent: "add this approved post to BrainOS’s queue for the selected time",
+  },
+  now: {
+    label: "Send now through Buffer",
+    consent: "send this post now through Buffer",
+  },
+};
+
+export function BufferDeliveryForm({
+  packageId,
+  packageVersion,
+  destination,
+  busy,
+  send,
+}: {
+  packageId: string;
+  packageVersion: number;
+  destination: string;
+  busy: boolean;
+  send: (
+    command: Record<string, unknown>,
+  ) => Promise<BufferDeliveryResult | null>;
+}) {
+  const [mode, setMode] = useState<BufferMode>("draft"),
+    [confirmed, setConfirmed] = useState(false),
+    [message, setMessage] = useState("");
+  return (
+    <form
+      className="control-form"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (busy || !confirmed) return;
+        const form = new FormData(event.currentTarget),
+          command: Record<string, unknown> = {
+            action: "buffer_delivery",
+            package_id: packageId,
+            mode,
+            confirmed: true,
+          };
+        if (mode === "schedule" || mode === "queue") {
+          const selected = new Date(String(form.get("scheduled_at") ?? ""));
+          if (
+            !Number.isFinite(selected.getTime()) ||
+            selected.getTime() <= Date.now()
+          ) {
+            setMessage("Choose a future date and time before scheduling.");
+            setConfirmed(false);
+            return;
+          }
+          command.scheduled_at = selected.toISOString();
+        }
+        setConfirmed(false);
+        setMessage("");
+        const result = await send(command);
+        if (result)
+          setMessage(
+            `Request recorded. Last observed delivery status: ${result.status ?? "pending verification"}${result.remote_status ? ` / ${result.remote_status}` : ""}. Review the delivery record for the current outcome.`,
+          );
+      }}
+    >
+      <h3>Deliver with Buffer</h3>
+      <p>
+        {destination} · Exact approved package v{packageVersion}
+      </p>
+      <label>
+        Buffer action
+        <select
+          value={mode}
+          disabled={busy}
+          onChange={(event) => {
+            setMode(event.target.value as BufferMode);
+            setConfirmed(false);
+            setMessage("");
+          }}
+        >
+          {Object.entries(bufferChoices).map(([value, choice]) => (
+            <option key={value} value={value}>
+              {choice.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {(mode === "schedule" || mode === "queue") && (
+        <label>
+          Scheduled date and time (your local time)
+          <input
+            type="datetime-local"
+            name="scheduled_at"
+            required
+            disabled={busy}
+            onChange={() => setConfirmed(false)}
+          />
+        </label>
+      )}
+      <p>
+        This uses the approved copy and media. A Buffer draft can be released
+        using the same package. Future posts stay in BrainOS until the selected
+        time, then the next hourly check verifies approval, rights, and current
+        evidence before sending through Buffer. Allow up to about an hour after
+        the selected time; service interruptions can delay delivery further.
+      </p>
+      <label className="consent">
+        <input
+          type="checkbox"
+          checked={confirmed}
+          disabled={busy}
+          onChange={(event) => setConfirmed(event.target.checked)}
+        />
+        I reviewed package v{packageVersion} for {destination} and authorize
+        BrainOS to {bufferChoices[mode].consent}.
+      </label>
+      <button className="button dark" disabled={busy || !confirmed}>
+        {bufferChoices[mode].label}
+      </button>
+      <p>
+        If posting is disabled for this workspace, Buffer actions remain blocked
+        until Daniel enables it.
+      </p>
+      {message && <p role="status">{message}</p>}
+      <Link href="/activation#distribution">
+        Review delivery status and blockers
+      </Link>
+    </form>
+  );
+}
+
 export function Workbench({
   state,
   stories,
@@ -150,6 +286,65 @@ export function Workbench({
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function downloadHandoff(p: Entity, format: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/control/handoff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          package_id: p.id,
+          package_version: p.version,
+          format,
+        }),
+      });
+      if (!response.ok) {
+        const body = await response.json();
+        throw Error(body.error ?? "Handoff unavailable");
+      }
+      const url = URL.createObjectURL(await response.blob()),
+        link = document.createElement("a");
+      link.href = url;
+      link.download =
+        response.headers
+          .get("Content-Disposition")
+          ?.match(/filename="([^"]+)"/)?.[1] ??
+        `brainos-handoff-v${p.version}.${format === "text" ? "txt" : format}`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to download handoff");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function sendBuffer(command: Record<string, unknown>) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/activation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(command),
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw Error(result.error ?? "Buffer action unavailable");
+      router.refresh();
+      return {
+        ...(typeof result.status === "string" ? { status: result.status } : {}),
+        ...(typeof result.remote_status === "string"
+          ? { remote_status: result.remote_status }
+          : {}),
+      };
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Buffer action unavailable");
+      return null;
     } finally {
       setBusy(false);
     }
@@ -683,21 +878,42 @@ export function Workbench({
                         : [],
                     })}
                   >
-                    {["tiktok", "youtube"].includes(c.data.platform) && (
-                      <Field
-                        name="privacy"
-                        label="Visibilidad elegida por Daniel"
-                        options={(c.data.platform === "tiktok"
-                          ? [
-                              "PUBLIC_TO_EVERYONE",
-                              "MUTUAL_FOLLOW_FRIENDS",
-                              "FOLLOWER_OF_CREATOR",
-                              "SELF_ONLY",
-                            ]
-                          : ["public", "unlisted", "private"]
-                        ).map((value) => ({ value, label: value }))}
-                      />
-                    )}
+                    {["tiktok", "youtube"].includes(c.data.platform) &&
+                      !(
+                        c.data.platform === "tiktok" &&
+                        entities("account").some(
+                          (a) =>
+                            a.data.platform === "tiktok" &&
+                            a.data.delivery_transport === "buffer",
+                        )
+                      ) && (
+                        <Field
+                          name="privacy"
+                          label="Visibilidad elegida por Daniel"
+                          options={(c.data.platform === "tiktok"
+                            ? [
+                                "PUBLIC_TO_EVERYONE",
+                                "MUTUAL_FOLLOW_FRIENDS",
+                                "FOLLOWER_OF_CREATOR",
+                                "SELF_ONLY",
+                              ]
+                            : ["public", "unlisted", "private"]
+                          ).map((value) => ({ value, label: value }))}
+                        />
+                      )}
+                    {c.data.platform === "tiktok" &&
+                      entities("account").some(
+                        (a) =>
+                          a.data.platform === "tiktok" &&
+                          a.data.delivery_transport === "buffer",
+                      ) && (
+                        <p>
+                          Buffer no admite cambiar la privacidad por esta API.
+                          Revisa la audiencia y los ajustes de la cuenta
+                          conectada en Buffer antes de aprobar; BrainOS no
+                          cambiará esa configuración.
+                        </p>
+                      )}
                     <Field name="title" label="Platform title / hook" />
                     <Field
                       name="caption"
@@ -711,6 +927,20 @@ export function Workbench({
                       optional
                       multiline
                     />
+                    {c.data.format === "video" &&
+                      entities("account").some(
+                        (a) =>
+                          a.data.platform === c.data.platform &&
+                          a.data.delivery_transport === "buffer",
+                      ) && (
+                        <p>
+                          Buffer no acepta una portada de imagen separada para
+                          un video. Para envío automático usa un paquete sin
+                          portada separada; para conservar una portada
+                          personalizada, descarga el paquete aprobado y úsala en
+                          el editor nativo.
+                        </p>
+                      )}
                     <Field
                       name="graphic"
                       label="Cover / carousel / graphic"
@@ -726,7 +956,17 @@ export function Workbench({
                     />
                   </Form>
                   {packages.map((p) => {
-                    const data = p.data as unknown as Package;
+                    const data = p.data as unknown as Package,
+                      finalApproved =
+                        data.status === "approved" &&
+                        c.data.final_approval?.package_id === p.id &&
+                        c.data.final_approval.package_version === p.version &&
+                        c.data.final_approval.fingerprint === data.fingerprint,
+                      bufferAccount = entities("account").find(
+                        (a) =>
+                          a.data.platform === data.platform &&
+                          a.data.delivery_transport === "buffer",
+                      );
                     return (
                       <section key={p.id}>
                         <h4>
@@ -763,6 +1003,78 @@ export function Workbench({
                             package_id: p.id,
                           })}
                         />
+                        {finalApproved &&
+                          !p.is_demo &&
+                          bufferAccount &&
+                          (bufferAccount.data.status === "connected" &&
+                          Array.isArray(bufferAccount.data.capabilities) &&
+                          bufferAccount.data.capabilities.includes(
+                            "publish",
+                          ) ? (
+                            <BufferDeliveryForm
+                              key={`${p.id}:${p.version}:${bufferAccount.id}:${bufferAccount.version}`}
+                              packageId={p.id}
+                              packageVersion={p.version}
+                              destination={`${data.platform} · ${String(bufferAccount.data.handle ?? "selected Buffer channel")}`}
+                              busy={busy}
+                              send={sendBuffer}
+                            />
+                          ) : (
+                            <p>
+                              Buffer needs a connected channel with posting
+                              access.{" "}
+                              <Link href="/activation">
+                                Review the connection
+                              </Link>
+                              .
+                            </p>
+                          ))}
+                        <form
+                          className="control-form"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            const form = new FormData(event.currentTarget);
+                            void downloadHandoff(
+                              p,
+                              String(form.get("format") ?? "html"),
+                            );
+                          }}
+                        >
+                          <h3>Publish with the platform’s own tools</h3>
+                          <p>
+                            Download the approved copy and private media links,
+                            then open the platform to upload and review them.
+                            The final Publish or Send action is yours.
+                          </p>
+                          <Field
+                            name="format"
+                            label="Download format"
+                            options={[
+                              {
+                                value: "html",
+                                label:
+                                  "HTML · copy buttons and asset downloads",
+                              },
+                              { value: "text", label: "Plain text" },
+                              { value: "json", label: "JSON" },
+                            ]}
+                          />
+                          {!finalApproved && (
+                            <p>
+                              Final approval of this exact package is required.
+                            </p>
+                          )}
+                          <button
+                            className="button"
+                            disabled={busy || !finalApproved}
+                          >
+                            Download native handoff
+                          </button>
+                          <p>
+                            No provider connection required. Downloading does
+                            not publish or send anything.
+                          </p>
+                        </form>
                         <Form
                           send={send}
                           busy={busy}

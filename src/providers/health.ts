@@ -1,6 +1,7 @@
 import type { Rpc } from "../ingestion/store";
 import { readControl } from "../control/service";
-import { OfficialClient, ProviderError, type TokenSet } from "./client";
+import { providerClient } from "./factory";
+import { ProviderError, type TokenSet } from "./client";
 import { providerToken } from "./auth";
 import type { Provider } from "../control/model";
 /** One hourly read per connected provider; never publishes or sends mail. */
@@ -13,7 +14,19 @@ export async function providerHealth(rpc: Rpc) {
       ["connected", "degraded"].includes(String(e.data.status)),
   )) {
     if (
+      account.data.delivery_transport === "buffer" &&
+      Date.parse(String(account.data.verified_at)) > Date.now() - 6 * 3600000
+    ) {
+      results.push({
+        provider: account.data.platform,
+        state: account.data.status,
+        next_check: "six_hour_interval",
+      });
+      continue;
+    }
+    if (
       account.data.platform === "x" &&
+      account.data.delivery_transport !== "buffer" &&
       process.env.BRAINOS_ALLOW_PAID_X !== "true"
     ) {
       results.push({ provider: "x", state: "BLOCKED_BY_PROVIDER_ACCESS" });
@@ -22,7 +35,7 @@ export async function providerHealth(rpc: Rpc) {
     let data: Record<string, unknown>;
     try {
       const tokens: TokenSet = await providerToken(rpc, account.id),
-        choices = await new OfficialClient(
+        choices = await providerClient(
           account.data.platform as Provider,
           tokens,
         ).discover(),

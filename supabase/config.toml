@@ -1,0 +1,7 @@
+project_id = "brainos"
+
+[functions.brainos-media]
+# Per-file 256-bit capability authentication is enforced by the handler;
+# browser/anonymous roles have no access to its private resolver RPC.
+verify_jwt = false
+entrypoint = "./functions/brainos-media/index.js"

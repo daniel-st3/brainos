@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Rpc } from "../ingestion/store";
+import { deliveryUrl, type DeliveryAsset } from "./delivery";
 import { readControl } from "../control/service";
 export async function rasterize(svg: string) {
   if (
@@ -86,6 +87,7 @@ export async function graphicRasterUrls(
   refs: { id: string; version: number }[],
   demo: boolean,
   format: "png" | "jpeg" = "png",
+  outboxId?: string,
 ) {
   const state = await readControl(rpc, demo),
     urls: string[] = [];
@@ -103,12 +105,22 @@ export async function graphicRasterUrls(
       throw Error("Current cleared graphic required");
     for (const o of g.data.outputs as {
       sha256: string;
-      png?: { file_id: string; source_svg_sha256: string };
-      jpeg?: { file_id: string; source_svg_sha256: string };
+      png?: DeliveryAsset & { source_svg_sha256: string };
+      jpeg?: DeliveryAsset & { source_svg_sha256: string };
     }[]) {
       const file = o[format];
       if (!file || file.source_svg_sha256 !== o.sha256)
         throw Error("Raster is missing or stale");
+      if (outboxId) {
+        urls.push(
+          await deliveryUrl(rpc, outboxId, `graphic:${g.id}:${o.sha256}`, {
+            ...file,
+            graphic_id: g.id,
+            graphic_version: g.version,
+          }),
+        );
+        continue;
+      }
       const { data, error } = await storageClient()
         .storage.from("brainos-production")
         .createSignedUrl(file.file_id, 7200);

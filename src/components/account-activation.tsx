@@ -5,12 +5,16 @@ type State = Awaited<ReturnType<typeof activationState>>;
 export function AccountActivation({ initial }: { initial: State }) {
   const [state, setState] = useState<State | null>(initial),
     [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [writeConfirmations, setWriteConfirmations] = useState<
+      Record<string, boolean>
+    >({});
   const load = async () => {
     const r = await fetch("/api/activation"),
       v = await r.json();
     if (!r.ok) throw Error(v.error);
     setState(v);
+    setWriteConfirmations({});
   };
   async function save(c: unknown) {
     setBusy(true);
@@ -53,13 +57,56 @@ export function AccountActivation({ initial }: { initial: State }) {
       <header className="page-header">
         <h1>Account Activation</h1>
         <p>
-          Crea la cuenta, registra el handle, conecta y verifica. Ninguna
-          publicación se envía en este candidato.
+          Crea la cuenta, registra el handle, conecta y verifica. Después
+          autoriza los envíos por cuenta; cada paquete conserva su aprobación
+          final.
         </p>
       </header>
       <p role="status" aria-live="polite">
         {message}
       </p>
+      <section className="panel">
+        <h2>Conexión gratuita: Instagram, TikTok y X</h2>
+        <p>
+          Crea tú la cuenta gratuita de Buffer y conecta tus tres canales allí.
+          Después pega una sola API key aquí y selecciona las cuentas
+          detectadas. No necesitas crear aplicaciones de desarrollador para
+          estos tres canales.
+        </p>
+        <p>
+          Plan gratuito: hasta 3 canales y 10 publicaciones en cola por canal.
+          BrainOS conserva la aprobación humana; conectar no publica nada.
+        </p>
+        <a href="https://buffer.com" target="_blank" rel="noopener noreferrer">
+          Crear / abrir Buffer ↗
+        </a>
+        {" · "}
+        <a
+          href="https://developers.buffer.com/guides/getting-started.html"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Obtener API key oficial ↗
+        </a>
+        <form
+          onSubmit={(e) => {
+            const form = e.currentTarget;
+            submit(e, (d) => ({ action: "buffer_key", key: d.get("key") }));
+            form.reset();
+          }}
+        >
+          <label>
+            API key privada de Buffer
+            <input name="key" type="password" autoComplete="off" required />
+          </label>
+          <button disabled={busy}>Detectar mis canales de Buffer</button>
+        </form>
+        <p>
+          Alternativa sin integraciones: descarga el paquete final aprobado y
+          súbelo en el editor oficial. Los archivos y textos quedan listos;
+          BrainOS no lo marca publicado automáticamente.
+        </p>
+      </section>
       <section className="panel">
         <h2>Identidad de handles</h2>
         <p>
@@ -116,7 +163,82 @@ export function AccountActivation({ initial }: { initial: State }) {
             </strong>{" "}
             · {p.engineering}
           </p>
-          <p>{String(p.blocker)}</p>
+          <p>
+            {p.free_connector
+              ? "Usa la conexión gratuita de Buffer de arriba. La integración directa sigue disponible como alternativa avanzada."
+              : String(p.blocker)}
+          </p>
+          <p>
+            Conexión elegida: {String(p.transport)}
+            {p.transport === "buffer" ? ` · ${String(p.blocker)}` : ""}
+          </p>
+          <p>
+            <strong>
+              {p.account?.data.writes_authorized === true
+                ? "Envíos autorizados"
+                : "Envíos deshabilitados"}
+            </strong>
+          </p>
+          {p.account &&
+            (p.account.data.writes_authorized === true ||
+              (!p.account.is_demo &&
+                p.account.data.status === "connected" &&
+                !!p.account.data.verified_at &&
+                !!p.account.data.external_id &&
+                (p.capabilities as string[]).includes("publish"))) && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (busy || !writeConfirmations[p.account!.id]) return;
+                  const id = p.account!.id;
+                  setWriteConfirmations((previous) => ({
+                    ...previous,
+                    [id]: false,
+                  }));
+                  void save({
+                    action: "distribution_authorize",
+                    id,
+                    enabled: p.account!.data.writes_authorized !== true,
+                    confirmed: true,
+                  });
+                }}
+              >
+                <h3>Permiso de envío para {p.platform}</h3>
+                <p>
+                  Cuenta:{" "}
+                  {String(p.account.data.handle || p.account.data.external_id)}.
+                  Conectar o volver a conectar deja los envíos deshabilitados
+                  hasta que los autorices aquí.
+                </p>
+                <label className="consent">
+                  <input
+                    type="checkbox"
+                    checked={writeConfirmations[p.account.id] ?? false}
+                    disabled={busy}
+                    onChange={(event) => {
+                      const checked = event.target.checked,
+                        id = p.account!.id;
+                      setWriteConfirmations((previous) => ({
+                        ...previous,
+                        [id]: checked,
+                      }));
+                    }}
+                  />
+                  {p.account.data.writes_authorized === true
+                    ? `Confirmo que quiero deshabilitar los futuros envíos de BrainOS a esta cuenta de ${p.platform}.`
+                    : `Autorizo futuros envíos de BrainOS a esta cuenta de ${p.platform}, únicamente de paquetes con aprobación final vigente y una acción de entrega confirmada.`}
+                </label>
+                <button disabled={busy || !writeConfirmations[p.account.id]}>
+                  {p.account.data.writes_authorized === true
+                    ? "Deshabilitar envíos de esta cuenta"
+                    : "Autorizar envíos de esta cuenta"}
+                </button>
+                <p>
+                  Esta decisión no aprueba contenido ni envía una publicación
+                  ahora. Puedes retirar el permiso desde esta misma pantalla.
+                </p>
+              </form>
+            )}
           <a href={p.signup} target="_blank" rel="noopener noreferrer">
             Crear cuenta en el sitio oficial ↗
           </a>
@@ -240,6 +362,42 @@ export function AccountActivation({ initial }: { initial: State }) {
                 Capacidades verificadas:{" "}
                 {(p.capabilities as string[]).join(", ") || "ninguna"}
               </p>
+              {p.transport === "buffer" && !!p.account.data.profile && (
+                <details>
+                  <summary>Capacidades del canal de Buffer</summary>
+                  <dl>
+                    {Object.entries(
+                      (
+                        p.account.data.profile as {
+                          raw?: {
+                            buffer_capabilities?: Record<string, unknown>;
+                          };
+                        }
+                      ).raw?.buffer_capabilities ?? {},
+                    )
+                      .filter(
+                        ([, v]) =>
+                          v === null ||
+                          typeof v === "boolean" ||
+                          typeof v === "string",
+                      )
+                      .map(([name, value]) => (
+                        <div key={name}>
+                          <dt>{name}</dt>
+                          <dd>
+                            {value === null
+                              ? "Por verificar"
+                              : value === true
+                                ? "Sí"
+                                : value === false
+                                  ? "No"
+                                  : String(value)}
+                          </dd>
+                        </div>
+                      ))}
+                  </dl>
+                </details>
+              )}
               <button
                 disabled={busy}
                 onClick={() => {
@@ -344,6 +502,33 @@ export function AccountActivation({ initial }: { initial: State }) {
           )}
         </section>
       ))}
+      <section className="panel" id="distribution">
+        <h2>Estado de distribución</h2>
+        <p>
+          Estado observado del outbox y del proveedor. Un borrador o una cola no
+          confirma publicación.
+        </p>
+        {state.distribution.length ? (
+          state.distribution.map((r) => (
+            <p key={r.id}>
+              {r.provider} · {r.status} ·{" "}
+              {r.remote_status ?? "sin envío remoto"}
+              {r.error ? ` · ${r.error}` : ""}
+              {r.url ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <a href={r.url} target="_blank" rel="noopener noreferrer">
+                    Ver publicación
+                  </a>
+                </>
+              ) : null}
+            </p>
+          ))
+        ) : (
+          <p>Sin envíos autorizados.</p>
+        )}
+      </section>
       <section className="panel">
         <h2>Brand Launch V1</h2>
         <button

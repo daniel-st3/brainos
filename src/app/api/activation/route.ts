@@ -54,6 +54,8 @@ export async function POST(request: Request) {
       );
       return response;
     }
+    if (c.action === "buffer_delivery")
+      return NextResponse.json({ saved: true, ...result });
     return NextResponse.json({ saved: true });
   } catch (e) {
     return NextResponse.json(

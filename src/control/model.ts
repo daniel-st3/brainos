@@ -121,6 +121,9 @@ export interface Brand {
 }
 export interface Account {
   platform: Provider;
+  delivery_transport?: "buffer" | "native";
+  api_version?: string;
+  implementation?: string;
   status:
     | "not_created"
     | "created_not_connected"

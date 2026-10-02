@@ -1,5 +1,6 @@
 import { ProviderError } from "../providers/client";
 import { publicAttribution } from "../providers/attribution";
+import { constraints } from "../providers/definitions";
 import { randomUUID } from "node:crypto";
 import type { Rpc } from "../ingestion/store";
 import type { Story } from "../domain/types";
@@ -156,6 +157,70 @@ function find<T = Record<string, unknown>>(
 function graphicsFor(state: ControlState, p: Package) {
   return p.graphic_ids.map((id) => find(state, id, "graphic"));
 }
+function validatePlatformPackage(p: Package, graphics: Entity[]) {
+  providerAdapter(p.platform).validatePackage(p);
+  const limits = constraints(p.platform);
+  if (p.title.length > limits.title)
+    throw Error(`${p.platform} title exceeds ${limits.title} characters`);
+  if (p.platform === "x") {
+    if (p.thread.length > 25 || p.thread.some((post) => !post.trim()))
+      throw Error("X thread must contain at most 25 nonempty posts");
+    const imageCount = graphics.reduce(
+      (count, graphic) =>
+        count +
+        (Array.isArray(graphic.data.outputs) ? graphic.data.outputs.length : 0),
+      0,
+    );
+    if (imageCount > 4)
+      throw Error(
+        "X supports at most 4 approved images; select a smaller graphic revision",
+      );
+  }
+}
+/** Compose the draft shown for exact-copy approval; dispatch sends it unchanged. */
+function platformCopy(
+  platform: Package["platform"],
+  caption: string,
+  thread: string[],
+  cta: string,
+  attribution: ReturnType<typeof publicAttribution>,
+) {
+  const posts = platform === "x" && thread.length ? [...thread] : [caption];
+  const existing = posts.join("\n"),
+    additions: string[] = [],
+    normalized = (value: string) =>
+      value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+  if (cta.trim() && !normalized(existing).includes(normalized(cta)))
+    additions.push(cta.trim());
+  const sourceUrls = new Set<string>();
+  for (const match of existing.matchAll(/https:\/\/[^\s<>"')\]]+/g)) {
+    try {
+      const url = new URL(match[0].replace(/[.,;!?]+$/, ""));
+      url.search = "";
+      url.hash = "";
+      sourceUrls.add(url.toString());
+    } catch {}
+  }
+  attribution.links.forEach((url, index) => {
+    if (sourceUrls.has(url)) return;
+    sourceUrls.add(url);
+    additions.push(
+      `${attribution.publishers[index]}${platform === "x" ? ":" : " —"} ${url}`,
+    );
+  });
+  if (platform !== "x")
+    return { caption: [caption, ...additions].join("\n\n"), thread };
+  for (const addition of additions) {
+    const last = posts.length - 1;
+    if (posts[last].length + 2 + addition.length <= 280)
+      posts[last] += `\n\n${addition}`;
+    else posts.push(addition);
+  }
+  return {
+    caption: posts[0],
+    thread: thread.length || posts.length > 1 ? posts : [],
+  };
+}
 export function readiness(
   content: Entity<Content>,
   state: ControlState,
@@ -246,7 +311,7 @@ export function readiness(
     )
       issues.push("Platform package is stale");
     try {
-      providerAdapter(content.data.platform).validatePackage(pkg.data);
+      validatePlatformPackage(pkg.data, g);
     } catch (e) {
       issues.push((e as Error).message);
     }
@@ -802,6 +867,14 @@ export async function controlAction(
       const gs = command.graphic_ids.map((id) => find(state, id, "graphic"));
       if (gs.some((g) => g.parent_id !== c.id))
         throw Error("Graphic belongs to another content item");
+      const attribution = publicAttribution(story, c.data.platform),
+        copy = platformCopy(
+          c.data.platform,
+          command.caption,
+          command.thread,
+          command.cta,
+          attribution,
+        );
       const p: Package = {
         status: "draft",
         content_id: c.id,
@@ -811,13 +884,13 @@ export async function controlAction(
         brand_id: brand.id,
         brand_version: brand.version,
         platform: c.data.platform,
-        caption: command.caption,
+        caption: copy.caption,
         privacy: command.privacy,
         title: command.title,
         cta: command.cta,
-        thread: command.thread,
-        source_links: publicAttribution(story, c.data.platform).links,
-        attribution: publicAttribution(story, c.data.platform),
+        thread: copy.thread,
+        source_links: attribution.links,
+        attribution,
         duration:
           production.packages.find((p) => p.id === c.data.production_id)?.data
             .output?.duration ?? null,
@@ -839,7 +912,7 @@ export async function controlAction(
         graphic_ids: command.graphic_ids,
         fingerprint: packageFingerprint(c, draft, production, gs),
       };
-      providerAdapter(p.platform).validatePackage(p);
+      validatePlatformPackage(p, gs);
       put("package", p, undefined, {
         parent_id: c.id,
         story_id: c.story_id,
@@ -858,7 +931,7 @@ export async function controlAction(
         packageFingerprint(c, draft, production, graphicsFor(state, p.data))
       )
         throw Error("Package changed; regenerate before approval");
-      providerAdapter(p.data.platform).validatePackage(p.data);
+      validatePlatformPackage(p.data, graphicsFor(state, p.data));
       put(
         "package",
         { ...p.data, status: "approved", approved_by: actor, approved_at: now },

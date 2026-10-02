@@ -10,7 +10,9 @@ import {
   type TokenSet,
   type Transport,
 } from "./client";
-import { readControl } from "../control/service";
+import { providerClient } from "./factory";
+import { BufferClient } from "./buffer-client";
+import { controlAction, readControl } from "../control/service";
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export const providerCookie = (p: Provider) => `brainos_${p}_oauth`;
 export async function startProviderAuth(
@@ -210,6 +212,7 @@ async function installPending(
   t: TokenSet,
   actor: string,
   send: Transport,
+  discovered?: Identity[],
 ) {
   const state = await readControl(rpc, false),
     a = state.entities.find((e) => e.id === id && e.kind === "account") as
@@ -218,7 +221,7 @@ async function installPending(
   let choices: Identity[] = [],
     reason = "Select the authorized account";
   try {
-    choices = await new OfficialClient(p, t, send).discover();
+    choices = discovered ?? (await providerClient(p, t, send).discover());
   } catch (e) {
     if (
       p !== "x" ||
@@ -237,15 +240,91 @@ async function installPending(
       data: {
         ...a.data,
         status: "auth_required",
+        writes_authorized: false,
+        writes_authorized_by: null,
+        writes_authorized_at: null,
         choices,
         reason,
-        api_version: definitions[p].version,
+        api_version:
+          t.transport === "buffer"
+            ? "buffer/2026-10-02"
+            : definitions[p].version,
+        delivery_transport: t.transport ?? "native",
         implementation: providerVersion,
       },
     },
     p_ciphertext: sealSecret(JSON.stringify(t), `provider:${id}`),
     p_actor: actor,
   });
+}
+export async function installBuffer(
+  rpc: Rpc,
+  key: string,
+  actor: string,
+  send: Transport = fetch,
+) {
+  if (key.length < 10 || key.length > 1000)
+    throw Error("Invalid private API credential");
+  const token: TokenSet = {
+    transport: "buffer",
+    access_token: key,
+    expires_at: 8640000000000000,
+    scopes: [],
+  };
+  const plans = [];
+  const initial = await readControl(rpc, false);
+  for (const provider of ["instagram", "tiktok", "x"] as const) {
+    const choices = await new BufferClient(provider, token, send).discover();
+    if (!choices.length) continue;
+    const existing = initial.entities.find(
+      (e) => e.kind === "account" && e.data.platform === provider,
+    );
+    if (
+      existing?.data.status === "connected" &&
+      existing.data.delivery_transport !== "buffer"
+    )
+      throw new ProviderError("DISCONNECT_NATIVE_ACCOUNT_BEFORE_BUFFER");
+    if (
+      existing?.data.external_id &&
+      !choices.some((c) => c.id === existing.data.external_id)
+    )
+      throw new ProviderError("DISCONNECT_BEFORE_ACCOUNT_CHANGE");
+    plans.push({ provider, choices, existing });
+  }
+  if (!plans.length)
+    throw new ProviderError("BUFFER_CONNECT_SOCIAL_CHANNELS_FIRST");
+  for (const { provider, choices, existing } of plans) {
+    if (!existing)
+      await controlAction(
+        rpc,
+        {
+          action: "account_create",
+          platform: provider,
+          handle: choices[0].handle || provider,
+        },
+        actor,
+        false,
+      );
+    const state = await readControl(rpc, false);
+    const account = state.entities.find(
+      (e) => e.kind === "account" && e.data.platform === provider,
+    )!;
+    await installPending(
+      rpc,
+      account.id,
+      provider,
+      token,
+      actor,
+      send,
+      choices,
+    );
+    if (choices.length === 1)
+      await selectProviderAccount(rpc, account.id, choices[0].id, actor, send);
+  }
+  return {
+    channels: plans.map((p) => p.provider),
+    selection_required: plans.some((p) => p.choices.length > 1),
+  };
 }
 export async function installBeehiiv(
   rpc: Rpc,
@@ -280,7 +359,7 @@ export async function selectProviderAccount(
     a = state.entities.find((e) => e.id === id && e.kind === "account");
   if (!a) throw Error("Account missing");
   const token = await providerToken(rpc, id, send),
-    choices = await new OfficialClient(
+    choices = await providerClient(
       a.data.platform as Provider,
       token,
       send,
@@ -398,11 +477,16 @@ export async function disconnectProvider(
   if (!a) throw Error("Account missing");
   let revoke = "revoked";
   try {
-    await new OfficialClient(
-      a.data.platform as Provider,
-      await providerToken(rpc, id, send),
-      send,
-    ).revoke();
+    const token = await providerToken(rpc, id, send);
+    if (token.transport === "buffer")
+      revoke =
+        "Local credential removed. Disconnect the channel or revoke the shared key in Buffer settings when appropriate; other connected channels may use it.";
+    else
+      await new OfficialClient(
+        a.data.platform as Provider,
+        token,
+        send,
+      ).revoke();
   } catch {
     revoke = "local removal complete; provider-side revocation requires review";
   }
@@ -414,6 +498,9 @@ export async function disconnectProvider(
       data: {
         ...a.data,
         status: "revoked",
+        writes_authorized: false,
+        writes_authorized_by: null,
+        writes_authorized_at: null,
         capabilities: [],
         external_id: null,
         choices: [],

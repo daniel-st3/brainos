@@ -2,6 +2,7 @@ import type { Provider } from "../control/model";
 import { appConfig, definitions, providerVersion } from "./definitions";
 import { validatePayload } from "./validation";
 export interface TokenSet {
+  transport?: "buffer";
   access_token: string;
   refresh_token?: string;
   expires_at: number;
@@ -18,6 +19,18 @@ export interface Identity {
   raw: Record<string, unknown>;
 }
 export interface Payload {
+  delivery?: {
+    mode: "draft" | "schedule" | "queue" | "now";
+    scheduled_at?: string;
+  };
+  images?: {
+    url: string;
+    mime: string;
+    bytes: number;
+    width: number;
+    height: number;
+    sha256: string;
+  }[];
   title: string;
   caption: string;
   thread: string[];
@@ -43,6 +56,8 @@ export interface Remote {
   ids?: string[];
   upload_url?: string;
   next_index?: number;
+  published_at?: string;
+  retry_after?: number;
   [key: string]: unknown;
 }
 export class ProviderError extends Error {
@@ -106,6 +121,17 @@ export class OfficialClient {
     }
     const r = obj(await response.json().catch(() => ({}))),
       e = obj(r.error);
+    if (
+      this.provider === "beehiiv" &&
+      method === "GET" &&
+      response.status === 202
+    )
+      throw new ProviderError(
+        "REMOTE_PROCESSING",
+        true,
+        false,
+        Math.max(60, Number(response.headers.get("retry-after")) || 3600),
+      );
     if (!response.ok || (e.code && e.code !== "ok")) {
       const status = response.status,
         code = str(e.code);
@@ -182,9 +208,16 @@ export class OfficialClient {
       if (p === "tiktok") {
         if (has("video.publish")) capabilities.push("media_upload");
         if (has("video.list")) capabilities.push("analytics");
-        if (process.env.TIKTOK_APP_AUDITED === "true" && has("video.publish"))
+        if (
+          process.env.TIKTOK_APP_AUDITED === "true" &&
+          process.env.TIKTOK_VERIFIED_MEDIA_PREFIX &&
+          has("video.publish")
+        )
           capabilities.push("publish", "schedule");
-        else blocks.push("TIKTOK_APP_AUDIT_AND_CREATOR_PRIVACY_REQUIRED");
+        else
+          blocks.push(
+            "TIKTOK_APP_AUDIT_PRIVATE_USE_POLICY_AND_VERIFIED_MEDIA_URL_REQUIRED",
+          );
       }
       if (p === "x") {
         if (has("tweet.write")) capabilities.push("publish", "schedule");
@@ -284,15 +317,25 @@ export class OfficialClient {
               : "processing",
         };
       await save({ ...remote, status: "publishing" });
-      const r = await this.request(`/${account}/media_publish`, "POST", {
-        creation_id: id,
-      });
+      let r: Record<string, unknown>;
+      try {
+        r = await this.request(`/${account}/media_publish`, "POST", {
+          creation_id: id,
+        });
+      } catch (e) {
+        if (e instanceof ProviderError && e.retryable && !e.uncertain)
+          await save({ ...remote, id, status: "container_ready" });
+        throw e;
+      }
       await save({ id: str(r.id), status: "published" });
-      const result = await this.request(`/${str(r.id)}?fields=id,permalink`);
+      const result = await this.request(
+        `/${str(r.id)}?fields=id,permalink,timestamp`,
+      );
       return {
         id: str(result.id),
         url: str(result.permalink),
         status: "published",
+        published_at: str(result.timestamp) || undefined,
       };
     }
     if (p === "tiktok") {
@@ -310,6 +353,21 @@ export class OfficialClient {
         payload.media.duration > Number(creator.max_video_post_duration_sec)
       )
         throw new ProviderError("CREATOR_DURATION_LIMIT");
+      const prefix = process.env.TIKTOK_VERIFIED_MEDIA_PREFIX;
+      if (!prefix) throw new ProviderError("VERIFIED_MEDIA_URL_REQUIRED");
+      const verified = new URL(prefix),
+        source = new URL(payload.media.url);
+      if (
+        verified.protocol !== "https:" ||
+        verified.username ||
+        verified.password ||
+        verified.search ||
+        verified.hash ||
+        !verified.pathname.endsWith("/") ||
+        source.origin !== verified.origin ||
+        !source.pathname.startsWith(verified.pathname)
+      )
+        throw new ProviderError("VERIFIED_MEDIA_URL_REQUIRED");
       const r = await this.request("/post/publish/video/init/", "POST", {
           post_info: {
             title: payload.caption,
@@ -322,64 +380,31 @@ export class OfficialClient {
             is_aigc: false,
           },
           source_info: {
-            source: "FILE_UPLOAD",
-            video_size: payload.media.bytes,
-            chunk_size: payload.media.bytes,
-            total_chunk_count: 1,
+            source: "PULL_FROM_URL",
+            video_url: payload.media.url,
           },
         }),
         d = obj(r.data);
-      if (!d.publish_id || !d.upload_url)
+      if (!d.publish_id)
         throw new ProviderError("UPLOAD_SESSION_FAILED", false, true);
-      const upload = new URL(str(d.upload_url)),
-        source = new URL(payload.media.url);
-      if (
-        upload.protocol !== "https:" ||
-        !upload.hostname.endsWith(".tiktokapis.com") ||
-        !upload.pathname.startsWith("/video/") ||
-        source.protocol !== "https:" ||
-        !source.hostname.endsWith(".supabase.co")
-      )
-        throw new ProviderError("INVALID_UPLOAD_SESSION");
-      await save({
-        id: str(d.publish_id),
-        status: "upload_pending",
-        upload_url: upload.toString(),
-      });
-      const download = await this.send(source.toString(), {
-        signal: AbortSignal.timeout(60000),
-        redirect: "error",
-      });
-      if (!download.ok || !download.body)
-        throw new ProviderError("MEDIA_UNAVAILABLE");
-      const init: RequestInit & { duplex: string } = {
-        method: "PUT",
-        duplex: "half",
-        headers: {
-          "Content-Type": payload.media.mime,
-          "Content-Length": String(payload.media.bytes),
-          "Content-Range": `bytes 0-${payload.media.bytes - 1}/${payload.media.bytes}`,
-        },
-        body: download.body,
-        signal: AbortSignal.timeout(120000),
-        redirect: "error",
-      };
-      let response: Response;
-      try {
-        response = await this.send(upload.toString(), init);
-      } catch {
-        throw new ProviderError("UPLOAD_INTERRUPTED", false, true);
-      }
-      if (response.status !== 201)
-        throw new ProviderError("UPLOAD_NOT_COMPLETE", false, true);
       await save({ id: str(d.publish_id), status: "processing" });
       return { id: str(d.publish_id), status: "processing" };
     }
     if (p === "x") {
       const texts = payload.thread.length ? payload.thread : [payload.caption],
         ids = remote.ids ?? [];
-      if ((payload.media || payload.media_urls.length) && !remote.media_id) {
-        const url = new URL(payload.media?.url ?? payload.media_urls[0]);
+      const mediaIds = (
+        Array.isArray(remote.media_ids)
+          ? remote.media_ids
+          : remote.media_id
+            ? [remote.media_id]
+            : []
+      ) as string[];
+      const urls = payload.media ? [payload.media.url] : payload.media_urls;
+      if (urls.length > 4 || (payload.media && payload.media_urls.length))
+        throw new ProviderError("X_MEDIA_COMBINATION_UNSUPPORTED");
+      for (let index = mediaIds.length; index < urls.length; index++) {
+        const url = new URL(urls[index]);
         if (url.protocol !== "https:" || !url.hostname.endsWith(".supabase.co"))
           throw new ProviderError("TRUSTED_MEDIA_REQUIRED");
         const r = await this.send(url.toString(), {
@@ -393,16 +418,17 @@ export class OfficialClient {
           bytes,
           payload.media?.mime ?? "image/png",
         );
+        mediaIds.push(uploaded.id);
         remote = {
           ...remote,
-          media_id: uploaded.id,
+          media_ids: [...mediaIds],
           status: "media_processing",
         };
         await save(remote);
       }
-      if (remote.media_id) {
+      for (const mediaId of mediaIds) {
         const r = await this.request(
-          `/media/upload?media_id=${encodeURIComponent(String(remote.media_id))}`,
+          `/media/upload?media_id=${encodeURIComponent(mediaId)}`,
         );
         const info = obj(obj(r.data).processing_info);
         if (info.state === "failed")
@@ -412,15 +438,27 @@ export class OfficialClient {
       }
       for (let i = ids.length; i < texts.length; i++) {
         await save({ ids: [...ids], next_index: i, status: "dispatching" });
-        const r = await this.request("/tweets", "POST", {
-          text: texts[i],
-          ...(ids.length
-            ? { reply: { in_reply_to_tweet_id: ids.at(-1) } }
-            : {}),
-          ...(i === 0 && remote.media_id
-            ? { media: { media_ids: [remote.media_id] } }
-            : {}),
-        });
+        let r: Record<string, unknown>;
+        try {
+          r = await this.request("/tweets", "POST", {
+            text: texts[i],
+            ...(ids.length
+              ? { reply: { in_reply_to_tweet_id: ids.at(-1) } }
+              : {}),
+            ...(i === 0 && mediaIds.length
+              ? { media: { media_ids: mediaIds } }
+              : {}),
+          });
+        } catch (e) {
+          if (e instanceof ProviderError && e.retryable && !e.uncertain)
+            await save({
+              ...remote,
+              ids: [...ids],
+              next_index: i,
+              status: "processing",
+            });
+          throw e;
+        }
         const id = str(obj(r.data).id);
         if (!id) throw new ProviderError("REMOTE_ID_MISSING", false, true);
         ids.push(id);
@@ -542,6 +580,7 @@ export class OfficialClient {
         url: `https://www.youtube.com/watch?v=${result.id}`,
       };
     }
+    if (remote.id) return this.lookup(account, remote);
     const r = await this.request(`/publications/${account}/posts`, "POST", {
         title: payload.title,
         body_content: payload.caption,
@@ -549,7 +588,10 @@ export class OfficialClient {
         ...(payload.publish_at ? { scheduled_at: payload.publish_at } : {}),
       }),
       d = obj(r.data);
-    return { id: str(d.id), url: str(d.web_url), status: "processing" };
+    if (!d.id) throw new ProviderError("PUBLICATION_ID_MISSING", false, true);
+    const next = { id: str(d.id), url: str(d.web_url), status: "processing" };
+    await save(next);
+    return next;
   }
   async setThumbnail(videoId: string, sourceUrl: string) {
     this.write();
@@ -642,7 +684,14 @@ export class OfficialClient {
     const id = encodeURIComponent(remote.id),
       p = this.provider;
     if (p === "instagram") {
-      const r = await this.request(`/${id}?fields=id,permalink,status_code`);
+      const container = [
+        "processing",
+        "container_ready",
+        "publishing",
+      ].includes(remote.status ?? "");
+      const r = await this.request(
+        `/${id}?fields=${container ? "status_code,status" : "id,permalink,timestamp"}`,
+      );
       return {
         ...remote,
         status: r.permalink
@@ -653,6 +702,7 @@ export class OfficialClient {
               ? "rejected"
               : "processing",
         url: str(r.permalink) || undefined,
+        published_at: str(r.timestamp) || undefined,
       };
     }
     if (p === "tiktok") {
@@ -713,14 +763,31 @@ export class OfficialClient {
         url: `https://www.youtube.com/watch?v=${id}`,
       };
     }
-    const r = obj(
-      (await this.request(`/publications/${account}/posts/${id}`)).data,
-    );
+    let r: Record<string, unknown>;
+    try {
+      r = obj(
+        (await this.request(`/publications/${account}/posts/${id}`)).data,
+      );
+    } catch (e) {
+      if (e instanceof ProviderError && e.code === "REMOTE_PROCESSING")
+        return { ...remote, status: "processing", retry_after: e.retryAfter };
+      throw e;
+    }
+    const published =
+      typeof r.publish_date === "number" ? r.publish_date * 1000 : NaN;
+    const active =
+      r.status === "confirmed" &&
+      Number.isFinite(published) &&
+      published <= Date.now();
     return {
       ...remote,
-      status:
-        r.status === "confirmed" ? "published" : str(r.status) || "processing",
+      status: active
+        ? "published"
+        : r.status === "confirmed"
+          ? "scheduled"
+          : str(r.status) || "processing",
       url: str(r.web_url) || undefined,
+      published_at: active ? new Date(published).toISOString() : undefined,
     };
   }
   async metrics(account: string, remote: Remote) {

@@ -978,7 +978,11 @@ it("encryption rotation reads old ciphertext with context fencing and writes onl
   expect(openSecret(next, "refresh")).toBe("fixture credential");
   expect(() => openSecret(old, "refresh")).toThrow();
 });
-it("TikTok uses checkpointed official FILE_UPLOAD without requiring a public delivery domain", async () => {
+it("TikTok uses verified PULL_FROM_URL for server-held media and checkpoints the publish ID", async () => {
+  vi.stubEnv(
+    "TIKTOK_VERIFIED_MEDIA_PREFIX",
+    "https://fixture.supabase.co/storage/",
+  );
   const calls: { url: string; init?: RequestInit }[] = [],
     saved: unknown[] = [];
   const responses = [
@@ -1033,17 +1037,13 @@ it("TikTok uses checkpointed official FILE_UPLOAD without requiring a public del
     ).id,
   ).toBe("fixture-publish");
   expect(JSON.parse(String(calls[1].init?.body)).source_info).toEqual({
-    source: "FILE_UPLOAD",
-    video_size: 3,
-    chunk_size: 3,
-    total_chunk_count: 1,
+    source: "PULL_FROM_URL",
+    video_url: p.media!.url,
   });
-  expect(calls.at(-1)?.init?.headers).toMatchObject({
-    "Content-Range": "bytes 0-2/3",
-  });
+  expect(calls).toHaveLength(2);
   expect(saved[0]).toMatchObject({
     id: "fixture-publish",
-    status: "upload_pending",
+    status: "processing",
   });
 });
 it("OAuth callback failures persist a sanitized deduplicated operational notification", async () => {
