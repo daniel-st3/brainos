@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """BrainOS local media worker. Originals are read-only; no social publishing."""
-import argparse, base64, hashlib, json, mimetypes, os, re, subprocess, sys, threading, time, urllib.request, urllib.error, uuid
+import argparse, base64, hashlib, json, mimetypes, os, re, subprocess, sys, threading, time, urllib.request, urllib.error, uuid, shutil
 from pathlib import Path
 from datetime import datetime, timezone
 from runtime import ActiveJob, WorkerLock, watch, setup_logging, safe_error, LOG
@@ -55,6 +55,22 @@ def sha(file):
         for b in iter(lambda: f.read(1024 * 1024), b""):
             h.update(b)
     return h.hexdigest()
+
+
+def validate_final_video(file):
+    executable = os.getenv("FFPROBE_PATH") or shutil.which("ffprobe")
+    if executable:
+        info = json.loads(subprocess.check_output([executable, "-v", "error", "-show_streams", "-show_format", "-of", "json", str(file)], timeout=30))
+        video = next(s for s in info["streams"] if s["codec_type"] == "video")
+        result = {"width": video["width"], "height": video["height"], "codec": video["codec_name"], "container": info["format"]["format_name"], "duration": float(info["format"]["duration"]), "bytes": int(info["format"]["size"]), "method": "ffprobe"}
+    else:
+        import av
+        with av.open(str(file)) as container:
+            video = container.streams.video[0]
+            result = {"width": video.width, "height": video.height, "codec": video.codec_context.name, "container": container.format.name, "duration": float(container.duration / av.time_base), "bytes": file.stat().st_size, "method": "pyav-libavformat"}
+    if result["codec"] != "h264" or "mp4" not in result["container"] or result["bytes"] <= 0:
+        raise RuntimeError("Final output must be a valid H264 MP4")
+    return result
 
 
 def local_file(value):
@@ -372,7 +388,7 @@ def render(file, spec, work):
 
 
 def worker_identity():
-    return {"protocol": 1, "worker_id": os.getenv("BRAINOS_WORKER_ID", "daniel-mac"), "worker_version": "media-worker/1.1"}
+    return {"protocol": 1, "worker_id": os.getenv("BRAINOS_WORKER_ID", "daniel-mac"), "worker_version": "media-worker/1.2"}
 
 
 def process_one():
@@ -443,6 +459,7 @@ def process_one():
                     "bytes": size,
                     "options": job["input"]["options"],
                     "subtitles": captions,
+                    "probe": validate_final_video(output),
                 }
             if sha(file) != original_hash:
                 raise RuntimeError("Original media changed while processing")

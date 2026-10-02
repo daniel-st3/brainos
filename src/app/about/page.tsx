@@ -1,6 +1,25 @@
 import { applicationRpc } from "@/ingestion/store";
 import { publicRecords } from "@/control/public";
 import { NewsletterSignup } from "@/components/newsletter-signup";
+import Link from "next/link";
+export async function generateMetadata() {
+  const origin = process.env.CONTENT_OS_ORIGIN;
+  return {
+    title: "Daniel / AI aplicada",
+    description: "Construir, probar y mostrar AI aplicada.",
+    alternates: { canonical: origin ? `${origin}/about` : undefined },
+    openGraph: {
+      title: "Daniel / AI aplicada",
+      images: [
+        { url: `${origin ?? ""}/api/public/share`, width: 1200, height: 630 },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: [`${origin ?? ""}/api/public/share`],
+    },
+  };
+}
 export const dynamic = "force-dynamic";
 export default async function About() {
   const records = await publicRecords(await applicationRpc()),
@@ -65,6 +84,10 @@ export default async function About() {
         </nav>
       )}
       <footer>
+        <Link href="/contact">Trabajemos juntos</Link> ·{" "}
+        <Link href="/privacy">Privacidad</Link> ·{" "}
+        <Link href="/terms">Condiciones</Link> ·{" "}
+        <Link href="/content">Contenido publicado</Link>
         Privacidad: guardamos el email, consentimiento y origen. No vendemos
         datos ni enviamos marketing automático. El registro es opcional.
       </footer>

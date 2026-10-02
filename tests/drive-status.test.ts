@@ -1,12 +1,18 @@
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { driveConnectionStatus } from "../src/integrations/drive-status";
-import { driveToken } from "../src/integrations/media";
 import {
   personalDriveRoot,
   personalDriveEmail,
-} from "../src/integrations/personal-drive";
+  fingerprint,
+} from "./drive-fixture";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { driveConnectionStatus } from "../src/integrations/drive-status";
+import { driveToken } from "../src/integrations/media";
 vi.mock("../src/integrations/media", () => ({ driveToken: vi.fn() }));
 beforeEach(() => {
+  vi.stubEnv("GOOGLE_DRIVE_ROOT_FINGERPRINT", fingerprint(personalDriveRoot));
+  vi.stubEnv(
+    "GOOGLE_DRIVE_ACCOUNT_FINGERPRINT",
+    fingerprint(personalDriveEmail.toLowerCase()),
+  );
   vi.stubEnv("CONTENT_OS_MODE", "supabase");
   vi.stubEnv("CONTENT_OS_ORIGIN", "https://brainos.example");
   vi.stubEnv("GOOGLE_CLIENT_ID", "test-client");

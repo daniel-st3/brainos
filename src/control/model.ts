@@ -26,7 +26,12 @@ export type Kind =
   | "question"
   | "link"
   | "notification"
-  | "publication";
+  | "publication"
+  | "profile"
+  | "handle"
+  | "outbox"
+  | "opportunity"
+  | "launch_plan";
 export interface Entity<T = Record<string, unknown>> {
   id: string;
   kind: Kind;
@@ -130,6 +135,7 @@ export interface Account {
   reason: string | null;
 }
 export interface Package {
+  privacy?: string;
   status: "draft" | "approved" | "invalidated";
   content_id: string;
   content_version: number;

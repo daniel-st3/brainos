@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Configure the dedicated BrainOS preview from a private Google web-client JSON."""
-import argparse, json, os, shutil, urllib.request, urllib.error
+import argparse, json, os, shutil, urllib.request, urllib.error, hashlib
 from pathlib import Path
 
 ORIGIN = "https://brainos-daniel-st3s-projects.vercel.app"
 PROJECT = "prj_UnhfdSb5poFegUtiMf7Vl6YI5kVb"
 TEAM = "team_5avUXFThVjAwm3IsDhzQoSlZ"
-ROOT = "1ioH_s2oxNZni7OwG54TScSxSaC33zIje"
+
 
 
 def dotenv(path):
@@ -48,11 +48,18 @@ def main():
         raise RuntimeError(
             "VERCEL_TOKEN is missing from the private infrastructure file/environment"
         )
+    runtime = dotenv(Path(__file__).resolve().parents[1] / ".env.local")
+    root = os.environ.get("GOOGLE_DRIVE_ROOT_ID") or runtime.get("GOOGLE_DRIVE_ROOT_ID")
+    email = os.environ.get("GOOGLE_DRIVE_ACCOUNT_EMAIL") or runtime.get("GOOGLE_DRIVE_ACCOUNT_EMAIL")
+    if not root or not email or not email.lower().endswith("@gmail.com"):
+        raise RuntimeError("Approved personal Drive root/account must be configured privately")
     values = {
         "GOOGLE_CLIENT_ID": client["client_id"],
         "GOOGLE_CLIENT_SECRET": client["client_secret"],
-        "GOOGLE_DRIVE_ROOT_ID": ROOT,
-        "GOOGLE_DRIVE_ACCOUNT_EMAIL": "Danix3102@gmail.com",
+        "GOOGLE_DRIVE_ROOT_ID": root,
+        "GOOGLE_DRIVE_ACCOUNT_EMAIL": email,
+        "GOOGLE_DRIVE_ROOT_FINGERPRINT": hashlib.sha256(root.encode()).hexdigest(),
+        "GOOGLE_DRIVE_ACCOUNT_FINGERPRINT": hashlib.sha256(email.lower().encode()).hexdigest(),
         "CONTENT_OS_ORIGIN": ORIGIN,
         "GMAIL_INTAKE_ENABLED": "false",
     }

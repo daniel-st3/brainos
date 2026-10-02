@@ -2,13 +2,31 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
   if (
-    ["/about", "/api/public/signup", "/api/public/unsubscribe"].includes(
-      request.nextUrl.pathname,
-    )
+    [
+      "/about",
+      "/contact",
+      "/privacy",
+      "/terms",
+      "/data-deletion",
+      "/content",
+      "/manifest.webmanifest",
+      "/robots.txt",
+      "/sitemap.xml",
+      "/offline",
+      "/api/public/contact",
+      "/api/public/signup",
+      "/api/public/unsubscribe",
+      "/api/public/share",
+    ].includes(request.nextUrl.pathname) ||
+    request.nextUrl.pathname.startsWith("/builds/")
   )
     return NextResponse.next();
   // This route uses a scoped worker credential, never a browser session.
-  if (request.nextUrl.pathname === "/api/production/worker")
+  if (
+    ["/api/production/worker", "/api/automation"].includes(
+      request.nextUrl.pathname,
+    )
+  )
     return NextResponse.next();
   if (process.env.CONTENT_OS_MODE !== "supabase") {
     if (process.env.VERCEL)
@@ -53,5 +71,5 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|icon.svg).*)"],
+  matcher: ["/((?!_next/static|_next/image|icon.svg|app-icon.png).*)"],
 };

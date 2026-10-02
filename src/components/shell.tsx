@@ -20,6 +20,9 @@ const nav = [
   ["/publish", "Publish", Send],
   ["/actions", "My Actions", ClipboardCheck],
   ["/workbench", "Content Workbench", LayoutDashboard],
+  ["/activation", "Account Activation", Send],
+  ["/operations-center", "Operations", ClipboardCheck],
+  ["/opportunities", "Opportunities", Inbox],
 ] as const;
 export function Shell({
   children,
@@ -30,7 +33,19 @@ export function Shell({
 }) {
   const pathname = usePathname(),
     [open, setOpen] = useState(false);
-  if (pathname === "/about") return <>{children}</>;
+  if (
+    [
+      "/about",
+      "/content",
+      "/contact",
+      "/privacy",
+      "/terms",
+      "/data-deletion",
+      "/offline",
+    ].includes(pathname) ||
+    pathname.startsWith("/builds/")
+  )
+    return <>{children}</>;
   return (
     <div className="app-shell">
       <aside className={`sidebar ${open ? "open" : ""}`}>

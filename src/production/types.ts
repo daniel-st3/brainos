@@ -79,6 +79,15 @@ export interface RenderOptions {
   remove_pauses: boolean;
 }
 export interface RenderOutput {
+  probe?: {
+    width: number;
+    height: number;
+    codec: string;
+    container: string;
+    duration: number;
+    bytes: number;
+    method: string;
+  };
   subtitles?: { srt: string; vtt: string; json: string };
   provider: "supabase" | "local";
   file_id: string;

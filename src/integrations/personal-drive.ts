@@ -1,17 +1,22 @@
 /** BrainOS is personal infrastructure. Fail closed before touching any Drive folder. */
-export const personalDriveRoot = "1ioH_s2oxNZni7OwG54TScSxSaC33zIje";
-export const personalDriveEmail = "Danix3102@gmail.com";
+import { createHash } from "node:crypto";
 export function personalDriveConfiguration() {
-  if (process.env.GOOGLE_DRIVE_ROOT_ID !== personalDriveRoot)
+  const root = process.env.GOOGLE_DRIVE_ROOT_ID ?? "",
+    email = process.env.GOOGLE_DRIVE_ACCOUNT_EMAIL ?? "";
+  const digest = (v: string) => createHash("sha256").update(v).digest("hex");
+  if (
+    !/^[A-Za-z0-9_-]{10,200}$/.test(root) ||
+    !process.env.GOOGLE_DRIVE_ROOT_FINGERPRINT ||
+    digest(root) !== process.env.GOOGLE_DRIVE_ROOT_FINGERPRINT
+  )
     throw Error("BrainOS requires its configured personal Drive folder.");
   if (
-    process.env.GOOGLE_DRIVE_ACCOUNT_EMAIL?.toLowerCase() !==
-    personalDriveEmail.toLowerCase()
+    !email.toLowerCase().endsWith("@gmail.com") ||
+    !process.env.GOOGLE_DRIVE_ACCOUNT_FINGERPRINT ||
+    digest(email.toLowerCase()) !== process.env.GOOGLE_DRIVE_ACCOUNT_FINGERPRINT
   )
-    throw Error(
-      "BrainOS requires the personal Google account Danix3102@gmail.com.",
-    );
-  return { root: personalDriveRoot, email: personalDriveEmail };
+    throw Error("BrainOS requires its approved personal Google account.");
+  return { root, email };
 }
 /** Only Drive error JSON is exposed, never headers or OAuth token responses. */
 export class DriveVerificationError extends Error {
@@ -63,7 +68,7 @@ export async function verifyPersonalDrive(
   );
   if (about?.user?.emailAddress?.toLowerCase() !== config.email.toLowerCase())
     throw Error(
-      "Wrong Google account. Connect Danix3102@gmail.com; no Drive folder was accessed.",
+      "Wrong Google account. Connect the approved personal account; no Drive folder was accessed.",
     );
   const verifiedAccount = about.user.emailAddress;
   const folder = await read(

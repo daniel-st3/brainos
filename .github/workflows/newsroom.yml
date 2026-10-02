@@ -1,10 +1,7 @@
 name: Morning newsroom
-# Explicit manual dispatch works on a candidate branch. GitHub schedules run only
-# from its default branch; this file does NOT make a candidate schedule live.
+# Supabase Cron is the sole timer. This workflow remains a manual recovery path.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '30 11 * * *' # 06:30 America/Bogota; Colombia has no DST.
 permissions:
   contents: read
 concurrency:
@@ -12,7 +9,6 @@ concurrency:
   cancel-in-progress: false
 jobs:
   morning:
-    if: vars.NEWSROOM_SCHEDULER == 'github'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -29,6 +25,4 @@ jobs:
       - run: npm ci
       - name: Verify runtime configuration
         run: node -e 'if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) throw Error("Supabase runtime secrets missing")'
-      - run: npm run ingest
-      - run: npm run operations
-        if: ${{ !cancelled() }}
+      - run: node node_modules/tsx/dist/cli.mjs scripts/automation.ts

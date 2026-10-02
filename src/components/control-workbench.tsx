@@ -670,6 +670,9 @@ export function Workbench({
                     title="Create a platform package"
                     build={(f) => ({
                       action: "package_create",
+                      ...(text(f, "privacy")
+                        ? { privacy: text(f, "privacy") }
+                        : {}),
                       id: c.id,
                       caption: text(f, "caption"),
                       title: text(f, "title"),
@@ -680,6 +683,21 @@ export function Workbench({
                         : [],
                     })}
                   >
+                    {["tiktok", "youtube"].includes(c.data.platform) && (
+                      <Field
+                        name="privacy"
+                        label="Visibilidad elegida por Daniel"
+                        options={(c.data.platform === "tiktok"
+                          ? [
+                              "PUBLIC_TO_EVERYONE",
+                              "MUTUAL_FOLLOW_FRIENDS",
+                              "FOLLOWER_OF_CREATOR",
+                              "SELF_ONLY",
+                            ]
+                          : ["public", "unlisted", "private"]
+                        ).map((value) => ({ value, label: value }))}
+                      />
+                    )}
                     <Field name="title" label="Platform title / hook" />
                     <Field
                       name="caption"
@@ -911,6 +929,11 @@ export function Workbench({
                       <p key={i}>
                         <a href={`/api/control/graphics/${e.id}?slide=${i}`}>
                           Download slide {i + 1} (SVG)
+                        </a>
+                        <a
+                          href={`/api/control/graphics/${e.id}?slide=${i}&format=png`}
+                        >
+                          Download slide {i + 1} (PNG)
                         </a>
                       </p>
                     ))}

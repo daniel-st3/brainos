@@ -34,6 +34,8 @@ export async function ensureProductionStorage() {
       "application/x-subrip",
       "application/json",
       "image/svg+xml",
+      "image/png",
+      "image/jpeg",
     ],
   });
   if (result.error) throw result.error;

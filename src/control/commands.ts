@@ -116,6 +116,17 @@ export const controlCommand = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("package_create"),
     id,
+    privacy: z
+      .enum([
+        "PUBLIC_TO_EVERYONE",
+        "MUTUAL_FOLLOW_FRIENDS",
+        "FOLLOWER_OF_CREATOR",
+        "SELF_ONLY",
+        "public",
+        "unlisted",
+        "private",
+      ])
+      .optional(),
     caption: text,
     title: short,
     cta: z.string().max(300),

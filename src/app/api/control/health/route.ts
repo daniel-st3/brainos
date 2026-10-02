@@ -6,6 +6,7 @@ import { dataMode } from "@/server/mode";
 import { controlSnapshot, accounts } from "@/control/service";
 import { workerAvailable } from "@/control/model";
 import { driveConnectionStatus } from "@/integrations/drive-status";
+import { schedulerHealth, type AutomationRun } from "@/operations/automation";
 export const dynamic = "force-dynamic";
 export async function GET() {
   try {
@@ -53,11 +54,9 @@ export async function GET() {
               errors: r.errors,
             })),
         },
-        scheduler: {
-          expected: "06:30 America/Bogota",
-          authority:
-            "Existing GitHub Actions workflow; API health does not independently verify GitHub schedule",
-        },
+        scheduler: schedulerHealth(
+          (await rpc("read_automation")) as AutomationRun[],
+        ),
         providers: accounts(state),
         jobs: {
           blocked: state.jobs.filter((j) => j.status === "blocked").length,

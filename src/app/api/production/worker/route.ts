@@ -138,6 +138,17 @@ export async function POST(request: Request) {
           sha256: z.string().regex(/^[a-f0-9]{64}$/),
           duration: z.number().positive(),
           bytes: z.number().int().positive(),
+          probe: z
+            .object({
+              width: z.number().int().positive(),
+              height: z.number().int().positive(),
+              codec: z.literal("h264"),
+              container: z.string().refine((v) => v.includes("mp4")),
+              duration: z.number().positive(),
+              bytes: z.number().int().positive(),
+              method: z.enum(["ffprobe", "pyav-libavformat"]),
+            })
+            .optional(),
           options: renderOptionsSchema,
           subtitles: z.object({
             srt: z.string().max(2000000),
@@ -153,6 +164,12 @@ export async function POST(request: Request) {
         )
       )
         throw Error("Render options differ from reviewed job");
+      if (
+        o.probe &&
+        (o.probe.bytes !== o.bytes ||
+          Math.abs(o.probe.duration - o.duration) > 0.2)
+      )
+        throw Error("Final media probe mismatch");
       if (!o.file_id.startsWith(p.id + "/") || o.file_id.includes(".."))
         throw Error("Output belongs to another production");
       if (process.env.CONTENT_OS_MODE === "supabase") {

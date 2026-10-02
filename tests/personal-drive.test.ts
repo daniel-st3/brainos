@@ -1,13 +1,21 @@
+import {
+  personalDriveRoot,
+  personalDriveEmail,
+  fingerprint,
+} from "./drive-fixture";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   DriveVerificationError,
-  personalDriveRoot,
-  personalDriveEmail,
   verifyPersonalDrive,
   personalDriveConfiguration,
 } from "../src/integrations/personal-drive";
 import { driveInfo } from "../src/production/storage";
 beforeEach(() => {
+  vi.stubEnv("GOOGLE_DRIVE_ROOT_FINGERPRINT", fingerprint(personalDriveRoot));
+  vi.stubEnv(
+    "GOOGLE_DRIVE_ACCOUNT_FINGERPRINT",
+    fingerprint(personalDriveEmail.toLowerCase()),
+  );
   vi.stubEnv("GOOGLE_DRIVE_ROOT_ID", personalDriveRoot);
   vi.stubEnv("GOOGLE_DRIVE_ACCOUNT_EMAIL", personalDriveEmail);
 });

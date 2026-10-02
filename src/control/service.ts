@@ -305,7 +305,7 @@ export function actions(
             ? "Review final render"
             : "Production task",
         detail: `${p.data.title} · ${p.data.state}`,
-        href: "/production/studio",
+        href: `/production/studio?package=${p.id}`,
         kind: "production",
       })),
     ...state.entities
@@ -320,7 +320,7 @@ export function actions(
         id: e.id,
         title: `Review ${e.kind}`,
         detail: String(e.data.title ?? e.data.name ?? e.data.text),
-        href: "/workbench",
+        href: `/workbench?tab=${e.kind === "package" ? "content" : e.kind === "take" ? "takes" : e.kind}`,
         kind: e.kind,
       })),
     ...state.jobs
@@ -805,6 +805,7 @@ export async function controlAction(
         brand_version: brand.version,
         platform: c.data.platform,
         caption: command.caption,
+        privacy: command.privacy,
         title: command.title,
         cta: command.cta,
         thread: command.thread,
@@ -889,7 +890,7 @@ export async function controlAction(
       const g = find(state, command.id, "graphic");
       if (g.data.status !== "rendered" || !g.data.sha256)
         throw Error("Render the asset before reviewing rights");
-      put(
+      const cleared = put(
         "graphic",
         {
           ...g.data,
@@ -910,6 +911,10 @@ export async function controlAction(
         },
         g,
       );
+      queue("graphic", cleared, `raster:${cleared.id}:${cleared.version}`, {
+        stage: "raster",
+        draft_revision: g.data.content_revision,
+      });
       break;
     }
     case "content_final": {
@@ -950,7 +955,9 @@ export async function controlAction(
       const reason =
         account.status !== "connected"
           ? `${p.data.platform}: ${account.status}; authorization required`
-          : "POSTING_DISABLED · explicit activation required";
+          : !account.capabilities.includes("publish")
+            ? "PUBLISH_CAPABILITY_UNAVAILABLE"
+            : null;
       queue(
         "distribution",
         p,
@@ -1416,28 +1423,50 @@ export async function processJobs(
         ) as Entity<Account> | undefined;
         const adapter = providerAdapter(p.data.platform, account?.data);
         adapter.validatePackage(p.data);
-        adapter.publish();
+        const { enqueueOutbox, processOutbox } =
+          await import("../providers/outbox");
+        const id = await enqueueOutbox(rpc, p.id, job.due_at, demo);
+        await rpc("finish_control_job", {
+          p_id: job.id,
+          p_token: job.lease_token,
+          p_status: "succeeded",
+          p_result: { outbox_id: id },
+          p_error: null,
+          p_retryable: false,
+        });
+        await processOutbox(rpc, demo);
+        processed.push(job.id);
+        continue;
       }
       if (kind === "analytics") {
-        const account = state.entities.find(
-          (a) => a.kind === "account" && a.data.platform === e.data.platform,
-        ) as Entity<Account> | undefined;
-        providerAdapter(
-          e.data.platform as Account["platform"],
-          account?.data,
-        ).fetchMetrics();
-        throw Error("Metrics transport unavailable");
+        const { captureAnalytics } = await import("../providers/outbox");
+        await captureAnalytics(rpc, job, demo);
+        processed.push(job.id);
+        continue;
       }
       const c = find<Content>(state, e.parent_id!, "content");
       exactDraft(c, stories);
       if (c.data.draft_revision !== job.input.draft_revision)
         throw Error("Graphic draft revision changed");
       const story = stories.find((s) => s.id === c.story_id)!;
-      const render = renderGraphic(
-        story,
-        c.id,
-        c.data.draft_revision!,
-        job.input.input as GraphicInput,
+      const render =
+        job.input.stage === "raster"
+          ? e.data
+          : renderGraphic(
+              story,
+              c.id,
+              c.data.draft_revision!,
+              job.input.input as GraphicInput,
+            );
+      const { rasterOutputs } = await import("../providers/raster");
+      const outputs = await rasterOutputs(
+        e.id,
+        render.outputs as {
+          svg: string;
+          sha256: string;
+          [key: string]: unknown;
+        }[],
+        demo,
       );
       const updated = {
         ...e,
@@ -1445,6 +1474,7 @@ export async function processJobs(
         data: {
           ...e.data,
           ...render,
+          outputs,
           status: "rendered",
           rendered_at: new Date().toISOString(),
         },

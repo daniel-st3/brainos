@@ -6,7 +6,7 @@ This is the app's own OAuth connection. Codex/ChatGPT connector consent does not
 
 1. In [Google Cloud Console](https://console.cloud.google.com/), select your existing BrainOS project, or create a dedicated project named **BrainOS** if none exists. Enable **Google Drive API** (`drive.googleapis.com`). No billing account is needed for this integration.
 2. In **Google Auth Platform → Branding**, use **BrainOS** as the app name, your own support email and developer contact. This is a private single-editor app.
-3. In **Audience**, choose **External** for a personal Google account. While in **Testing**, add **Danix3102@gmail.com**, which owns the personal **Daniel AI Content OS** folder as a test user. The BrainOS login email and Google account do not have to match. Testing-mode Drive refresh tokens normally expire after seven days; testing is not a permanent unattended authorization. Before relying on long-term access, review Google's personal-use/verification requirements and the consent app's publishing status. This Google setting is separate from Vercel production deployment.
+3. In **Audience**, choose **External** for a personal Google account. While in **Testing**, add **<private-approved-personal-email>**, which owns the personal **Daniel AI Content OS** folder as a test user. The BrainOS login email and Google account do not have to match. Testing-mode Drive refresh tokens normally expire after seven days; testing is not a permanent unattended authorization. Before relying on long-term access, review Google's personal-use/verification requirements and the consent app's publishing status. This Google setting is separate from Vercel production deployment.
 4. In **Data Access**, configure the existing app scope: `https://www.googleapis.com/auth/drive`. This is a restricted full-Drive scope. The app checks the configured root and descendants for production media, but Google consent itself is not limited to that folder. Do not add Gmail scopes. The current implementation needs existing arbitrary file IDs; changing to `drive.file` would require a separate picker/access redesign and is outside this hardening pass.
 5. In **Clients → Create client → Web application**, name the client **BrainOS preview**. Set this exact **Authorized redirect URI**:
 
@@ -30,8 +30,8 @@ Required settings:
 | Setting | Value |
 | --- | --- |
 | `CONTENT_OS_ORIGIN` | `https://brainos-daniel-st3s-projects.vercel.app` |
-| `GOOGLE_DRIVE_ROOT_ID` | `1ioH_s2oxNZni7OwG54TScSxSaC33zIje` |
-| `GOOGLE_DRIVE_ACCOUNT_EMAIL` | `Danix3102@gmail.com` |
+| `GOOGLE_DRIVE_ROOT_ID` | `<private-approved-personal-root>` |
+| `GOOGLE_DRIVE_ACCOUNT_EMAIL` | `<private-approved-personal-email>` |
 | `GOOGLE_CLIENT_ID` | From downloaded web-client JSON |
 | `GOOGLE_CLIENT_SECRET` | From downloaded web-client JSON; encrypted, server only |
 | `INTEGRATION_ENCRYPTION_KEY` | Existing runtime key; do not rotate while saved tokens depend on it |
@@ -53,7 +53,7 @@ References: [Google web-server OAuth](https://developers.google.com/identity/pro
 
 ## Personal-only enforcement
 
-The only permitted Google account is **Danix3102@gmail.com** and the only root is the personal folder above. OAuth callback and every refreshed Drive token verify the account before accessing a folder, then require write access (`capabilities.canAddChildren`); ownership is not required. All linked media must descend from that root. A wrong account or changed root fails closed. No work folder is used or modified.
+The only permitted Google account is **<private-approved-personal-email>** and the only root is the personal folder above. OAuth callback and every refreshed Drive token verify the account before accessing a folder, then require write access (`capabilities.canAddChildren`); ownership is not required. All linked media must descend from that root. A wrong account or changed root fails closed. No work folder is used or modified.
 
 
 ### Read-only consent diagnostics

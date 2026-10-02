@@ -15,8 +15,26 @@ export async function GET(
     const index = Number(new URL(request.url).searchParams.get("slide") ?? 0);
     if (!Number.isInteger(index) || index < 0 || !g)
       throw Error("Graphic missing");
-    const outputs = g.data.outputs as { svg: string }[] | undefined;
+    const outputs = g.data.outputs as
+      | { svg: string; sha256: string; png?: { source_svg_sha256: string } }[]
+      | undefined;
     if (!outputs?.[index]) throw Error("Rendered slide missing");
+    if (new URL(request.url).searchParams.get("format") === "png") {
+      const o = outputs[index];
+      if (!o.png || o.png.source_svg_sha256 !== o.sha256)
+        throw Error("Raster missing/stale");
+      const { rasterBytes } = await import("@/providers/raster");
+      return new Response(
+        Uint8Array.from(await rasterBytes(id, o.sha256, dataMode() === "demo")),
+        {
+          headers: {
+            "Content-Type": "image/png",
+            "Content-Disposition": `attachment; filename="${id}-${index + 1}.png"`,
+            "Cache-Control": "private, no-store",
+          },
+        },
+      );
+    }
     return new Response(outputs[index].svg, {
       headers: {
         "Content-Type": "image/svg+xml",

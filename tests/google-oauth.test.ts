@@ -1,4 +1,9 @@
 import {
+  personalDriveRoot,
+  personalDriveEmail,
+  fingerprint,
+} from "./drive-fixture";
+import {
   afterAll,
   afterEach,
   beforeAll,
@@ -25,13 +30,18 @@ beforeAll(async () => {
 });
 afterAll(async () => db.close());
 beforeEach(() => {
+  vi.stubEnv("GOOGLE_DRIVE_ROOT_FINGERPRINT", fingerprint(personalDriveRoot));
+  vi.stubEnv(
+    "GOOGLE_DRIVE_ACCOUNT_FINGERPRINT",
+    fingerprint(personalDriveEmail.toLowerCase()),
+  );
   vi.stubEnv("INTEGRATION_ENCRYPTION_KEY", "a".repeat(64));
   vi.stubEnv("CONTENT_OS_MODE", "supabase");
   vi.stubEnv("CONTENT_OS_ORIGIN", "https://newsroom.example");
   vi.stubEnv("GOOGLE_CLIENT_ID", "test-client");
   vi.stubEnv("GOOGLE_CLIENT_SECRET", "test-secret");
-  vi.stubEnv("GOOGLE_DRIVE_ROOT_ID", "1ioH_s2oxNZni7OwG54TScSxSaC33zIje");
-  vi.stubEnv("GOOGLE_DRIVE_ACCOUNT_EMAIL", "Danix3102@gmail.com");
+  vi.stubEnv("GOOGLE_DRIVE_ROOT_ID", personalDriveRoot);
+  vi.stubEnv("GOOGLE_DRIVE_ACCOUNT_EMAIL", personalDriveEmail);
 });
 afterEach(() => vi.unstubAllEnvs());
 describe("Google runtime OAuth", () => {

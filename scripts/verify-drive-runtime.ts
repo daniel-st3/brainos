@@ -1,9 +1,8 @@
 /** Authorized runtime check. Creates/removes only its own temporary file, never a folder. */
 import { driveToken } from "../src/integrations/media";
 import { driveInfo } from "../src/production/storage";
-const root = process.env.GOOGLE_DRIVE_ROOT_ID;
-if (root !== "1ioH_s2oxNZni7OwG54TScSxSaC33zIje")
-  throw Error("Expected existing Daniel AI Content OS root");
+import { personalDriveConfiguration } from "../src/integrations/personal-drive";
+const { root } = personalDriveConfiguration();
 const token = await driveToken();
 const headers = { Authorization: `Bearer ${token}` };
 const info = await fetch(
