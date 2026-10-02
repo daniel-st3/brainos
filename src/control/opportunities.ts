@@ -16,6 +16,9 @@ export const opportunitySchema = z
     email: z.email().max(254),
     company: z.string().trim().max(200).default(""),
     role: z.string().trim().max(200).default(""),
+    company_size: z.string().max(100).default(""),
+    current_ai: z.string().max(500).default(""),
+    budget: z.string().max(100).default(""),
     details: z.string().trim().min(10).max(4000),
     consent: z.literal(true),
     website: z.string().max(200).default(""),
@@ -38,6 +41,11 @@ export async function submitOpportunity(rpc: Rpc, raw: unknown, ip: string) {
       company: p.company,
       role: p.role,
       details: p.details,
+      context: {
+        company_size: p.company_size,
+        current_ai: p.current_ai,
+        budget: p.budget,
+      },
     },
     p_hash: hash,
   });

@@ -171,7 +171,8 @@ export async function processOutbox(
   send: Transport = fetch,
 ) {
   let processed = 0;
-  for (let n = 0; n < 10; n++) {
+  const deadline = Date.now() + 210000;
+  for (let n = 0; n < 10 && Date.now() < deadline; n++) {
     const row = (await rpc("claim_provider_outbox", {
       p_demo: demo,
     })) as Outbox | null;
@@ -320,7 +321,12 @@ export async function processOutbox(
                 package_version: p.version,
                 platform: row.provider,
                 external_id: remote.id,
-                remote,
+                remote: {
+                  id: remote.id,
+                  ids: remote.ids,
+                  url: remote.url,
+                  status: remote.status,
+                },
                 url: remote.url,
                 account_id: a.id,
                 api_version:
@@ -351,6 +357,12 @@ export async function processOutbox(
           })),
           p_public: [],
           p_actor: "distribution-outbox",
+        });
+      if (!sim && remote.url)
+        await rpc("attach_publication_url", {
+          p_content: c.id,
+          p_version: existing ? c.version : c.version + 1,
+          p_url: remote.url,
         });
       await patch({
         status: "published",

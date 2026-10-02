@@ -42,6 +42,7 @@ export function Shell({
       "/terms",
       "/data-deletion",
       "/offline",
+      "/recording-demo",
     ].includes(pathname) ||
     pathname.startsWith("/builds/")
   )

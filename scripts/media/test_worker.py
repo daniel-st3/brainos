@@ -2,7 +2,7 @@
 
 import json, os, tempfile, unittest
 from pathlib import Path
-from worker import remap_segments, render, sha, probe
+from worker import remap_segments, render, sha, probe, validate_final_video
 
 
 class WorkerTests(unittest.TestCase):
@@ -45,6 +45,10 @@ class WorkerTests(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory(prefix="brainos-render-test-") as tmp:
             output, duration, captions = render(source, spec, Path(tmp))
+            final=validate_final_video(output)
+            self.assertEqual(final["codec"],"h264")
+            self.assertEqual((final["width"],final["height"]),(720,1280))
+            self.assertEqual(final["bytes"],output.stat().st_size)
             self.assertAlmostEqual(duration, 5, delta=0.2)
             self.assertNotEqual(sha(output), original)
             self.assertEqual(sha(source), original)

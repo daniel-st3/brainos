@@ -35,6 +35,16 @@ export function OpportunityInbox({
       <a href="/api/opportunities?export=subscribers">
         Exportar suscriptores con consentimiento (privado)
       </a>
+      <button
+        onClick={() => {
+          if (
+            confirm("Sincronizar consentimiento con beehiiv sin enviar emails?")
+          )
+            void send({ action: "sync_subscribers", confirmed: true });
+        }}
+      >
+        Sincronizar suscriptores (requiere activación explícita)
+      </button>
       {rows.map((r) => (
         <article className="control-card" key={r.id}>
           <h3>

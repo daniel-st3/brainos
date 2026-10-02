@@ -755,3 +755,268 @@ it("stale content cannot dispatch an earlier approved outbox", async () => {
     ),
   ).toBe(false);
 });
+it("expired dispatch lease is reclaimed for reconciliation and uncertain writes cannot retry", async () => {
+  const id = await approvedPackage(),
+    out = await enqueueOutbox(
+      rpc,
+      id,
+      new Date(Date.now() - 1000).toISOString(),
+      true,
+    );
+  await db.query(
+    "update provider_outbox set status='dispatching',lease_until=now()-interval '1 second',remote=$2 where id=$1",
+    [
+      out,
+      JSON.stringify({
+        status: "dispatching",
+        upload_url: "https://example.invalid/private-upload-token",
+      }),
+    ],
+  );
+  const row = (await rpc("claim_provider_outbox", { p_demo: true })) as {
+    id: string;
+    lease_token: string;
+  };
+  expect(row.id).toBe(out);
+  expect(await rpc("claim_provider_outbox", { p_demo: true })).toBeNull();
+  const visible = await rpc("read_provider_outbox", { p_demo: true });
+  expect(JSON.stringify(visible)).not.toContain("private-upload-token");
+  await rpc("update_provider_outbox", {
+    p_id: out,
+    p_token: row.lease_token,
+    p_patch: { status: "uncertain", release: true },
+  });
+  await expect(
+    rpc("recover_provider_outbox", {
+      p_id: out,
+      p_action: "retry",
+      p_actor: "Daniel demo",
+      p_demo: true,
+    }),
+  ).rejects.toThrow("reconcile");
+  await rpc("recover_provider_outbox", {
+    p_id: out,
+    p_action: "reconcile",
+    p_actor: "Daniel demo",
+    p_demo: true,
+  });
+  expect(
+    (
+      (await rpc("claim_provider_outbox", { p_demo: true })) as {
+        status: string;
+      }
+    ).status,
+  ).toBe("dispatching");
+  await db.query("update provider_outbox set status='cancel' where id=$1", [
+    out,
+  ]);
+}, 30000);
+it("refresh token lease admits one holder and fails closed after disconnect", async () => {
+  const a = (await readControl(rpc, false)).entities.find(
+    (e) => e.kind === "account",
+  )!;
+  await rpc("provider_secret", { p_id: a.id, p_ciphertext: "fixture-cipher" });
+  const first = crypto.randomUUID(),
+    second = crypto.randomUUID();
+  expect(
+    await rpc("claim_provider_refresh", {
+      p_id: a.id,
+      p_expected: "fixture-cipher",
+      p_token: first,
+    }),
+  ).toBe(true);
+  expect(
+    await rpc("claim_provider_refresh", {
+      p_id: a.id,
+      p_expected: "fixture-cipher",
+      p_token: second,
+    }),
+  ).toBe(false);
+  await rpc("provider_secret", { p_id: a.id, p_delete: true });
+  await expect(
+    rpc("finish_provider_refresh", {
+      p_id: a.id,
+      p_token: first,
+      p_ciphertext: "new-fixture-cipher",
+    }),
+  ).rejects.toThrow("lease lost");
+});
+it("launch initialization creates eight blocked content records and a real campaign, idempotently", async () => {
+  await activationAction(
+    rpc,
+    { action: "launch_initialize" },
+    "Daniel demo",
+    true,
+  );
+  const s = await readControl(rpc, true),
+    launch = s.entities.find((e) => e.kind === "launch_plan")!;
+  const slots = launch.data.slots as { content_id: string }[];
+  expect(slots).toHaveLength(8);
+  for (const slot of slots) {
+    const c = s.entities.find((e) => e.id === slot.content_id)!;
+    expect(c.kind).toBe("content");
+    expect(c.data.final_approval).toBeNull();
+    expect(c.draft_id).toBeNull();
+  }
+  expect(s.entities.find((e) => e.id === launch.data.campaign_id)?.kind).toBe(
+    "campaign",
+  );
+  await activationAction(
+    rpc,
+    { action: "launch_initialize" },
+    "Daniel demo",
+    true,
+  );
+  expect(
+    (await readControl(rpc, true)).entities.filter(
+      (e) => e.kind === "launch_plan",
+    ),
+  ).toHaveLength(1);
+});
+it("beehiiv unsubscribe uses official PATCH and nested metric names preserve semantics", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const c = new OfficialClient(
+    "beehiiv",
+    token,
+    async (url, init) => {
+      calls.push({ url, init });
+      return json({
+        data: { stats: { email: { unique_opens: 9 }, web: { views: 20 } } },
+      });
+    },
+    true,
+  );
+  await c.syncSubscriber(
+    "pub_fixture",
+    "demo@example.com",
+    false,
+    "sub_fixture",
+  );
+  expect(calls[0].init?.method).toBe("PATCH");
+  expect(JSON.parse(String(calls[0].init?.body))).toEqual({
+    unsubscribe: true,
+  });
+  expect(
+    (await c.metrics("pub_fixture", { id: "post_fixture" })).values,
+  ).toEqual({ "email.unique_opens": 9, "web.views": 20 });
+});
+it("same-path launch simulation reaches human baseline review and a pending learning idea", async () => {
+  const id = await approvedPackage();
+  await enqueueOutbox(rpc, id, new Date(Date.now() - 1000).toISOString(), true);
+  await processOutbox(rpc, true);
+  const before = await readControl(rpc, true),
+    pub = before.entities.find(
+      (e) => e.kind === "publication" && e.data.package_id === id,
+    )!;
+  await db.query(
+    "update control_jobs set due_at=now()-interval '1 minute' where entity_id=$1",
+    [pub.id],
+  );
+  await processJobs(rpc, "analytics", true);
+  await controlAction(
+    rpc,
+    {
+      action: "performance_review",
+      id: pub.id,
+      notes:
+        "DEMO: descriptive synthetic metrics only; no claim of audience response",
+    },
+    "Daniel demo",
+    true,
+  );
+  const after = await readControl(rpc, true);
+  expect(
+    after.entities.some(
+      (e) => e.kind === "review" && e.data.publication_id === pub.id,
+    ),
+  ).toBe(true);
+  const idea = after.entities.find(
+    (e) => e.kind === "idea" && e.parent_id === pub.id,
+  )!;
+  expect(idea.data.status).toBe("captured");
+  expect(idea.data.source).toBe("analytics");
+  const c = after.entities.find((e) => e.id === pub.parent_id)!;
+  expect(c.data.analytics_state).toBe("reviewed");
+}, 30000);
+it("encryption rotation reads old ciphertext with context fencing and writes only the new key", async () => {
+  const { sealSecret, openSecret } =
+    await import("../src/integrations/google-oauth");
+  vi.stubEnv("INTEGRATION_ENCRYPTION_KEY", "a".repeat(64));
+  const old = sealSecret("fixture credential", "refresh");
+  vi.stubEnv("INTEGRATION_ENCRYPTION_KEY", "b".repeat(64));
+  vi.stubEnv("INTEGRATION_ENCRYPTION_KEY_PREVIOUS", "a".repeat(64));
+  expect(openSecret(old, "refresh")).toBe("fixture credential");
+  expect(() => openSecret(old, "other-account")).toThrow();
+  const next = sealSecret(openSecret(old, "refresh"), "refresh");
+  vi.stubEnv("INTEGRATION_ENCRYPTION_KEY_PREVIOUS", "");
+  expect(openSecret(next, "refresh")).toBe("fixture credential");
+  expect(() => openSecret(old, "refresh")).toThrow();
+});
+it("TikTok uses checkpointed official FILE_UPLOAD without requiring a public delivery domain", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [],
+    saved: unknown[] = [];
+  const responses = [
+    json({
+      data: {
+        privacy_level_options: ["SELF_ONLY"],
+        max_video_post_duration_sec: 60,
+      },
+    }),
+    json({
+      data: {
+        publish_id: "fixture-publish",
+        upload_url:
+          "https://open-upload.tiktokapis.com/video/?upload_id=fixture",
+      },
+    }),
+    new Response(new Uint8Array([1, 2, 3])),
+    new Response(null, { status: 201 }),
+  ];
+  const client = new OfficialClient(
+    "tiktok",
+    token,
+    async (url, init) => {
+      calls.push({ url, init });
+      return responses.shift()!;
+    },
+    true,
+  );
+  const p: Payload = {
+    title: "DEMO",
+    caption: "DEMO",
+    thread: [],
+    source_links: [],
+    media_urls: [],
+    privacy: "SELF_ONLY",
+    media: {
+      url: "https://fixture.supabase.co/storage/fixture",
+      mime: "video/mp4",
+      bytes: 3,
+      duration: 10,
+      width: 720,
+      height: 1280,
+      codec: "h264",
+      sha256: "fixture",
+    },
+  };
+  expect(
+    (
+      await client.publish("fixture", p, {}, async (r) => {
+        saved.push(r);
+      })
+    ).id,
+  ).toBe("fixture-publish");
+  expect(JSON.parse(String(calls[1].init?.body)).source_info).toEqual({
+    source: "FILE_UPLOAD",
+    video_size: 3,
+    chunk_size: 3,
+    total_chunk_count: 1,
+  });
+  expect(calls.at(-1)?.init?.headers).toMatchObject({
+    "Content-Range": "bytes 0-2/3",
+  });
+  expect(saved[0]).toMatchObject({
+    id: "fixture-publish",
+    status: "upload_pending",
+  });
+});

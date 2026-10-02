@@ -322,12 +322,13 @@ export async function providerToken(
     string | null;
   if (!encrypted) throw new ProviderError("AUTH_REQUIRED");
   let t = JSON.parse(openSecret(encrypted, `provider:${id}`)) as TokenSet;
-  if (t.expires_at > Date.now() + 120000) return t;
+  if (t.expires_at > Date.now() + 7 * 86400000) return t;
   const a = (await readControl(rpc, false)).entities.find(
       (e) => e.id === id && e.kind === "account",
     ),
     p = a?.data.platform as Provider;
   if (!p) throw new ProviderError("ACCOUNT_MISMATCH");
+  if (p !== "instagram" && t.expires_at > Date.now() + 120000) return t;
   const lease = randomUUID();
   if (
     !(await rpc("claim_provider_refresh", {

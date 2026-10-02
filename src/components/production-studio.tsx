@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useRouter,useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { DriveConnectionStatus } from "@/integrations/drive-status";
 import Link from "next/link";
 import type { Story } from "@/domain/types";
@@ -23,10 +23,14 @@ export function ProductionStudio({
   driveStatus: DriveConnectionStatus;
 }) {
   const router = useRouter();
-  const requested=useSearchParams().get("package");
+  const requested = useSearchParams().get("package");
   const [state, setState] = useState(initial),
     [selected, setSelected] = useState<string[]>([]),
-    [active, setActive] = useState(initial.packages.find(p=>p.id===requested)?.id??initial.packages[0]?.id ?? ""),
+    [active, setActive] = useState(
+      initial.packages.find((p) => p.id === requested)?.id ??
+        initial.packages[0]?.id ??
+        "",
+    ),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");

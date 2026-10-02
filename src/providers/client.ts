@@ -129,6 +129,9 @@ export class OfficialClient {
   private write() {
     if (!this.writes) throw new ProviderError("EXTERNAL_PUBLISHING_DISABLED");
     this.paid();
+    if (!this.tokens.access_token) throw new ProviderError("AUTH_REQUIRED");
+    if (this.tokens.expires_at <= Date.now())
+      throw new ProviderError("TOKEN_EXPIRED");
   }
   async discover(): Promise<Identity[]> {
     const p = this.provider;
@@ -319,11 +322,57 @@ export class OfficialClient {
             is_aigc: false,
           },
           source_info: {
-            source: "PULL_FROM_URL",
-            video_url: payload.media.url,
+            source: "FILE_UPLOAD",
+            video_size: payload.media.bytes,
+            chunk_size: payload.media.bytes,
+            total_chunk_count: 1,
           },
         }),
         d = obj(r.data);
+      if (!d.publish_id || !d.upload_url)
+        throw new ProviderError("UPLOAD_SESSION_FAILED", false, true);
+      const upload = new URL(str(d.upload_url)),
+        source = new URL(payload.media.url);
+      if (
+        upload.protocol !== "https:" ||
+        !upload.hostname.endsWith(".tiktokapis.com") ||
+        !upload.pathname.startsWith("/video/") ||
+        source.protocol !== "https:" ||
+        !source.hostname.endsWith(".supabase.co")
+      )
+        throw new ProviderError("INVALID_UPLOAD_SESSION");
+      await save({
+        id: str(d.publish_id),
+        status: "upload_pending",
+        upload_url: upload.toString(),
+      });
+      const download = await this.send(source.toString(), {
+        signal: AbortSignal.timeout(60000),
+        redirect: "error",
+      });
+      if (!download.ok || !download.body)
+        throw new ProviderError("MEDIA_UNAVAILABLE");
+      const init: RequestInit & { duplex: string } = {
+        method: "PUT",
+        duplex: "half",
+        headers: {
+          "Content-Type": payload.media.mime,
+          "Content-Length": String(payload.media.bytes),
+          "Content-Range": `bytes 0-${payload.media.bytes - 1}/${payload.media.bytes}`,
+        },
+        body: download.body,
+        signal: AbortSignal.timeout(120000),
+        redirect: "error",
+      };
+      let response: Response;
+      try {
+        response = await this.send(upload.toString(), init);
+      } catch {
+        throw new ProviderError("UPLOAD_INTERRUPTED", false, true);
+      }
+      if (response.status !== 201)
+        throw new ProviderError("UPLOAD_NOT_COMPLETE", false, true);
+      await save({ id: str(d.publish_id), status: "processing" });
       return { id: str(d.publish_id), status: "processing" };
     }
     if (p === "x") {
@@ -485,6 +534,8 @@ export class OfficialClient {
         throw new ProviderError("UPLOAD_INTERRUPTED", false, true);
       const result = (await response.json()) as { id: string };
       await save({ id: result.id, status: "processing" });
+      if (payload.media_urls[0])
+        await this.setThumbnail(result.id, payload.media_urls[0]);
       return {
         id: result.id,
         status: "processing",
@@ -499,6 +550,41 @@ export class OfficialClient {
       }),
       d = obj(r.data);
     return { id: str(d.id), url: str(d.web_url), status: "processing" };
+  }
+  async setThumbnail(videoId: string, sourceUrl: string) {
+    this.write();
+    if (this.provider !== "youtube")
+      throw new ProviderError("UNSUPPORTED_CAPABILITY");
+    const source = new URL(sourceUrl);
+    if (
+      source.protocol !== "https:" ||
+      !source.hostname.endsWith(".supabase.co")
+    )
+      throw new ProviderError("TRUSTED_MEDIA_REQUIRED");
+    const r = await this.send(sourceUrl, {
+      redirect: "error",
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) throw new ProviderError("MEDIA_UNAVAILABLE");
+    const bytes = await r.arrayBuffer();
+    if (bytes.byteLength > 2000000)
+      throw new ProviderError("THUMBNAIL_TOO_LARGE");
+    const response = await this.send(
+      `https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${encodeURIComponent(videoId)}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.tokens.access_token}`,
+          "Content-Type": r.headers.get("content-type") ?? "image/png",
+        },
+        body: bytes,
+        redirect: "error",
+        signal: AbortSignal.timeout(25000),
+      },
+    );
+    if (!response.ok)
+      throw new ProviderError("THUMBNAIL_CAPABILITY_UNAVAILABLE");
+    return response.json();
   }
   async uploadX(bytes: Uint8Array, mime: string) {
     this.write();
@@ -759,7 +845,7 @@ export class OfficialClient {
     }
     return this.request(`/publications/${account}/subscriptions`, "POST", {
       email,
-      reactivate_existing: active,
+      reactivate_existing: false,
       send_welcome_email: false,
     });
   }

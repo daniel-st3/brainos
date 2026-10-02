@@ -21,6 +21,9 @@ export function OpportunityForm({ deletion = false }: { deletion?: boolean }) {
               company: d.get("company") ?? "",
               role: d.get("role") ?? "",
               details: d.get("details"),
+              company_size: d.get("company_size") ?? "",
+              current_ai: d.get("current_ai") ?? "",
+              budget: d.get("budget") ?? "",
               consent: d.get("consent") === "on",
               website: d.get("website"),
             }),
@@ -63,6 +66,18 @@ export function OpportunityForm({ deletion = false }: { deletion?: boolean }) {
           <label>
             Empresa
             <input name="company" maxLength={200} />
+          </label>
+          <label>
+            Tamaño de empresa (opcional)
+            <input name="company_size" maxLength={100} />
+          </label>
+          <label>
+            Uso actual de AI (opcional)
+            <input name="current_ai" maxLength={500} />
+          </label>
+          <label>
+            Rango de presupuesto (opcional)
+            <input name="budget" maxLength={100} />
           </label>
           <label>
             Rol

@@ -6,6 +6,10 @@ import { applicationRpc } from "@/ingestion/store";
 import { csv } from "@/control/export";
 const command = z.discriminatedUnion("action", [
   z.object({
+    action: z.literal("sync_subscribers"),
+    confirmed: z.literal(true),
+  }),
+  z.object({
     action: z.literal("review"),
     id: z.uuid(),
     status: z.enum([
@@ -51,6 +55,10 @@ export async function POST(request: Request) {
     const actor = await editor(),
       c = command.parse(await request.json()),
       rpc = await applicationRpc();
+    if (c.action === "sync_subscribers") {
+      const { syncSubscribers } = await import("@/providers/subscribers");
+      return NextResponse.json(await syncSubscribers(rpc));
+    }
     if (c.action === "review")
       await rpc("review_opportunity", {
         p_id: c.id,

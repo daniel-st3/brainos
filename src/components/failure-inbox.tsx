@@ -70,6 +70,32 @@ export function FailureInbox({ center }: { center: Omit<Center, "state"> }) {
           <p>{f.error}</p>
           <p>Intentos: {f.attempts}</p>
           <Link href={f.href}>Abrir revisión</Link>
+          {["control", "outbox"].includes(f.recovery) && (
+            <button
+              onClick={async () => {
+                const r = await fetch("/api/activation", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(
+                    f.recovery === "outbox"
+                      ? {
+                          action: "outbox_recover",
+                          id: f.id,
+                          operation: "resolved",
+                        }
+                      : { action: "job_resolve", id: f.id },
+                  ),
+                });
+                setMessage(
+                  r.ok
+                    ? "Resolución registrada; historial conservado"
+                    : "No se pudo resolver",
+                );
+              }}
+            >
+              Marcar resuelto
+            </button>
+          )}
           {["control", "media", "outbox"].includes(f.recovery) && (
             <button onClick={() => retry(f)}>
               {f.status === "uncertain"

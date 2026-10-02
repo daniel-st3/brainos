@@ -135,6 +135,13 @@ export interface Account {
   reason: string | null;
 }
 export interface Package {
+  attribution?: {
+    text: string;
+    links: string[];
+    publishers: string[];
+    source_card_refs: string[];
+    version: string;
+  };
   privacy?: string;
   status: "draft" | "approved" | "invalidated";
   content_id: string;

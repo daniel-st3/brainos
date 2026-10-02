@@ -343,18 +343,20 @@ export function AccountActivation({ initial }: { initial: State }) {
           Preparar ocho slots y estructura BrainOS
         </button>
         <p>Ningún guion u opinión se aprueba automáticamente.</p>
+        <a href="/recording-demo">
+          Abrir demo seguro para grabación (datos ficticios)
+        </a>
         {state.entities
           .filter((e) => e.kind === "launch_plan")
           .map((e) => (
             <div key={e.id}>
               <h3>{String(e.data.name)}</h3>
-              {(e.data.slots as { title: string; status: string }[]).map(
-                (s) => (
-                  <p key={s.title}>
-                    {s.title} — {s.status}
-                  </p>
-                ),
-              )}
+              {state.launch_slots.map((s) => (
+                <p key={s.title}>
+                  {s.title} — {s.readiness.ready ? "READY" : "BLOCKED"} ·{" "}
+                  {s.readiness.issues.join(" · ")}
+                </p>
+              ))}
             </div>
           ))}
       </section>

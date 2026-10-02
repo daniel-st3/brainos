@@ -1,3 +1,5 @@
+import { ProviderError } from "../providers/client";
+import { publicAttribution } from "../providers/attribution";
 import { randomUUID } from "node:crypto";
 import type { Rpc } from "../ingestion/store";
 import type { Story } from "../domain/types";
@@ -809,9 +811,8 @@ export async function controlAction(
         title: command.title,
         cta: command.cta,
         thread: command.thread,
-        source_links: story.sources
-          .filter((s) => s.is_primary)
-          .map((s) => s.canonical_url),
+        source_links: publicAttribution(story, c.data.platform).links,
+        attribution: publicAttribution(story, c.data.platform),
         duration:
           production.packages.find((p) => p.id === c.data.production_id)?.data
             .output?.duration ?? null,
@@ -1076,7 +1077,10 @@ export async function controlAction(
         "publication",
         {
           ...p.data,
-          raw_snapshots: [...(p.data.raw_snapshots as unknown[]), snapshot],
+          raw_snapshots: [
+            ...((p.data.raw_snapshots as unknown[]) ?? []),
+            snapshot,
+          ],
         },
         p,
       );
@@ -1086,13 +1090,19 @@ export async function controlAction(
     }
     case "performance_review": {
       const p = find(state, command.id, "publication"),
-        snaps = p.data.raw_snapshots as { metrics: Record<string, number> }[];
+        snaps = (p.data.raw_snapshots ??
+          (
+            p.data.metrics as { values: Record<string, number> }[] | undefined
+          )?.map((m) => ({ metrics: m.values })) ??
+          []) as { metrics: Record<string, number> }[];
       if (!snaps.length) throw Error("Measured metrics required");
       const peers = state.entities.filter(
         (e) =>
           e.kind === "publication" &&
           e.id !== p.id &&
-          hash(e.data.dimensions) === hash(p.data.dimensions),
+          hash(e.data.dimensions ?? e.data.content_dimensions) ===
+            hash(p.data.dimensions ?? p.data.content_dimensions) &&
+          e.data.simulated === p.data.simulated,
       );
       const latest = snaps.at(-1)!.metrics;
       const comparisons = Object.fromEntries(
@@ -1100,9 +1110,13 @@ export async function controlAction(
           metric,
           baseline(
             peers.flatMap((e) => {
-              const v = (
-                e.data.raw_snapshots as { metrics: Record<string, number> }[]
-              ).at(-1)?.metrics[metric];
+              const snapshots = (e.data.raw_snapshots ??
+                (
+                  e.data.metrics as
+                    { values: Record<string, number> }[] | undefined
+                )?.map((m) => ({ metrics: m.values })) ??
+                []) as { metrics: Record<string, number> }[];
+              const v = snapshots.at(-1)?.metrics[metric];
               return v === undefined ? [] : [v];
             }),
             value,
@@ -1493,11 +1507,22 @@ export async function processJobs(
       await rpc("finish_control_job", {
         p_id: job.id,
         p_token: job.lease_token,
-        p_status: kind !== "graphic" ? "blocked" : "failed",
+        p_status:
+          error instanceof ProviderError && error.retryable
+            ? "failed"
+            : kind !== "graphic"
+              ? "blocked"
+              : "failed",
         p_result: {},
         p_error: message,
         p_retryable: kind !== "graphic",
       });
+      if (error instanceof ProviderError && error.retryable && !error.uncertain)
+        await rpc("reschedule_control_retry", {
+          p_id: job.id,
+          p_delay: error.retryAfter,
+          p_demo: demo,
+        });
     }
     processed.push(job.id);
   }

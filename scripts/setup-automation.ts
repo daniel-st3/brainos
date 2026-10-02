@@ -1,5 +1,8 @@
 /** Run locally with private env. Never prints bearer secrets or SQL containing them. */
-export {};
+import { Agent, fetch } from "undici";
+const dispatcher = new Agent({
+  connect: { autoSelectFamily: true, timeout: 30000 },
+});
 const project = process.env.SUPABASE_PROJECT_REF,
   token = process.env.SUPABASE_ACCESS_TOKEN,
   secret = process.env.BRAINOS_SCHEDULER_SECRET,
@@ -20,6 +23,7 @@ async function sql(query: string) {
     `https://api.supabase.com/v1/projects/${project}/database/query`,
     {
       method: "POST",
+      dispatcher,
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -56,6 +60,7 @@ end $$;
 revoke all on function public.dispatch_brainos_automation(text,text) from public,anon,authenticated;
 select cron.schedule('brainos-discovery','30 11 * * *',$job$select public.dispatch_brainos_automation('discovery');$job$);
 select cron.schedule('brainos-operations','17 * * * *',$job$select public.dispatch_brainos_automation('operations');$job$);`);
+await dispatcher.close();
 console.log(
   "Supabase Cron installed: daily 11:30 UTC discovery; hourly minute 17 operations. Secret values stored only in Vault.",
 );

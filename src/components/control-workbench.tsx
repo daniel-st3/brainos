@@ -937,6 +937,37 @@ export function Workbench({
                         </a>
                       </p>
                     ))}
+                  <a href={`/api/control/graphics/${e.id}?format=manifest`}>
+                    Ordered raster manifest
+                  </a>
+                  <button
+                    disabled={busy || e.data.rights !== "cleared"}
+                    onClick={async () => {
+                      if (
+                        !confirm(
+                          "Exportar estas imágenes aprobadas a la carpeta personal Drive?",
+                        )
+                      )
+                        return;
+                      setError("");
+                      const r = await fetch("/api/activation", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: "carousel_drive",
+                          id: e.id,
+                          confirmed: true,
+                        }),
+                      });
+                      if (!r.ok) setError((await r.json()).error);
+                      else
+                        setError(
+                          "Imágenes exportadas en orden; IDs guardados. Ninguna publicación.",
+                        );
+                    }}
+                  >
+                    Exportar todos los PNG a Drive personal
+                  </button>
                   <p>
                     Rights: {String(e.data.rights)} · draft r
                     {String(e.data.content_revision)}

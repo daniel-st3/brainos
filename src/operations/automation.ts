@@ -107,11 +107,24 @@ export async function executeAutomation(
       results.push(await processJobs(rpc, kind, false));
     const { processOutbox } = await import("../providers/outbox");
     results.push(await processOutbox(rpc, false));
+    const { providerHealth } = await import("../providers/health");
+    results.push(await providerHealth(rpc));
+    const { syncSubscribers } = await import("../providers/subscribers");
+    results.push(await syncSubscribers(rpc));
     await rpc("cleanup_activation");
     const { driveConnectionStatus } =
       await import("../integrations/drive-status");
     const drive = await driveConnectionStatus(rpc);
-    results.push({ smoke: { database: "reachable", drive: drive.state } });
+    const { readControl } = await import("../control/service");
+    const { workerAvailable } = await import("../control/model");
+    const current = await readControl(rpc, false);
+    results.push({
+      smoke: {
+        database: "reachable",
+        drive: drive.state,
+        worker: workerAvailable(current) ? "available" : "offline",
+      },
+    });
     const { notifyOperations } = await import("./center");
     await notifyOperations(rpc, false);
     if (ingestionFailed)

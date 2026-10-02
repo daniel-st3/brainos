@@ -23,6 +23,23 @@ export async function operationsCenter(rpc: Rpc, demo: boolean) {
     ]);
   const scheduler = schedulerHealth(runs),
     failures = [
+      ...state.entities
+        .filter(
+          (e) =>
+            e.kind === "account" &&
+            ["degraded", "auth_required", "revoked"].includes(
+              String(e.data.status),
+            ),
+        )
+        .map((e) => ({
+          id: e.id,
+          subsystem: "OAuth",
+          error: String(e.data.reason ?? "Provider authorization required"),
+          status: String(e.data.status),
+          attempts: 0,
+          href: "/activation",
+          recovery: "none",
+        })),
       ...state.jobs
         .filter((j) => ["blocked", "failed", "dead_letter"].includes(j.status))
         .map((j) => ({
@@ -87,6 +104,25 @@ export async function operationsCenter(rpc: Rpc, demo: boolean) {
     worker: { available: workerAvailable(state), presence: state.workers },
     failures,
     notifications: state.entities.filter((e) => e.kind === "notification"),
+    analytics_ready: state.entities
+      .filter(
+        (e) =>
+          e.kind === "publication" &&
+          (e.data.metrics as unknown[] | undefined)?.length,
+      )
+      .map((e) => ({
+        key: `analytics:${e.id}:${(e.data.metrics as unknown[]).length}`,
+        title: "Analytics ready for review",
+        href: "/workbench?tab=analytics",
+      })),
+    brief_ready: discovery.runs
+      .filter((r) => r.status === "success")
+      .slice(0, 1)
+      .map((r) => ({
+        key: `brief:${r.id}`,
+        title: "Morning Brief updated",
+        href: "/brief",
+      })),
     pending_scripts: stories.flatMap((s) =>
       s.drafts
         .filter((d) => d.status === "draft" && d.id === s.active_draft_id)
@@ -110,6 +146,8 @@ export async function notifyOperations(rpc: Rpc, demo: boolean) {
   const center = await operationsCenter(rpc, demo),
     existing = new Set(center.notifications.map((e) => e.data.key)),
     signals = [
+      ...center.brief_ready,
+      ...center.analytics_ready,
       ...center.pending_scripts,
       ...center.final_renders,
       ...center.failures.map((f) => ({

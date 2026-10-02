@@ -31,17 +31,29 @@ export function openSecret(value: string, context: string) {
   const [version, nonce, tag, ciphertext, ...rest] = value.split(".");
   if (version !== "v1" || !nonce || !tag || !ciphertext || rest.length)
     throw new Error("Invalid encrypted credential.");
-  const decipher = createDecipheriv(
-    "aes-256-gcm",
+  const previous = process.env.INTEGRATION_ENCRYPTION_KEY_PREVIOUS;
+  const keys = [
     key(),
-    Buffer.from(nonce, "base64url"),
-  );
-  decipher.setAAD(Buffer.from(`${purpose}:${context}`));
-  decipher.setAuthTag(Buffer.from(tag, "base64url"));
-  return Buffer.concat([
-    decipher.update(Buffer.from(ciphertext, "base64url")),
-    decipher.final(),
-  ]).toString("utf8");
+    ...(previous && /^[a-f0-9]{64}$/i.test(previous)
+      ? [Buffer.from(previous, "hex")]
+      : []),
+  ];
+  for (const candidate of keys) {
+    try {
+      const decipher = createDecipheriv(
+        "aes-256-gcm",
+        candidate,
+        Buffer.from(nonce, "base64url"),
+      );
+      decipher.setAAD(Buffer.from(`${purpose}:${context}`));
+      decipher.setAuthTag(Buffer.from(tag, "base64url"));
+      return Buffer.concat([
+        decipher.update(Buffer.from(ciphertext, "base64url")),
+        decipher.final(),
+      ]).toString("utf8");
+    } catch {}
+  }
+  throw Error("Invalid encrypted credential or key; no credential logged");
 }
 export function oauthConfiguration() {
   const origin = process.env.CONTENT_OS_ORIGIN,

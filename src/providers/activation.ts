@@ -6,8 +6,14 @@ import {
   type Brand,
   type Entity,
   type Provider,
+  type Content,
 } from "../control/model";
-import { readControl, controlAction } from "../control/service";
+import {
+  readControl,
+  controlAction,
+  controlSnapshot,
+  readiness,
+} from "../control/service";
 import { definitions, appConfig } from "./definitions";
 import {
   startProviderAuth,
@@ -68,10 +74,16 @@ export const activationCommand = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("launch_initialize") }),
   z.object({
+    action: z.literal("carousel_drive"),
+    id,
+    confirmed: z.literal(true),
+  }),
+  z.object({
     action: z.literal("outbox_recover"),
     id,
     operation: z.enum(["retry", "reconcile", "cancel", "resolved"]),
   }),
+  z.object({ action: z.literal("job_resolve"), id }),
   z.object({ action: z.literal("acknowledge"), id }),
 ]);
 export function profileDraft(
@@ -113,8 +125,23 @@ export function profileDrift(
   return { status: fields.length ? "DRIFT" : "MATCH", fields };
 }
 export async function activationState(rpc: Rpc, demo: boolean) {
-  const s = await readControl(rpc, demo);
+  const { state: s, stories, production } = await controlSnapshot(rpc, demo);
+  const launch = s.entities.find((e) => e.kind === "launch_plan");
+  const launch_slots = (
+    (launch?.data.slots ?? []) as { title: string; content_id: string | null }[]
+  ).map((slot) => {
+    const c = s.entities.find(
+      (e) => e.id === slot.content_id && e.kind === "content",
+    ) as Entity<Content> | undefined;
+    return {
+      ...slot,
+      readiness: c
+        ? readiness(c, s, stories, production)
+        : { ready: false, issues: ["Content selection required"] },
+    };
+  });
   return {
+    launch_slots,
     ...s,
     providers: platforms.map((p) => {
       let ready = false;
@@ -162,6 +189,18 @@ export async function activationAction(
   demo: boolean,
 ) {
   const c = activationCommand.parse(raw);
+  if (c.action === "job_resolve") {
+    await rpc("resolve_control_job", {
+      p_id: c.id,
+      p_demo: demo,
+      p_actor: actor,
+    });
+    return {};
+  }
+  if (c.action === "carousel_drive") {
+    const { exportCarouselDrive } = await import("./carousel");
+    return exportCarouselDrive(rpc, c.id, demo);
+  }
   if (c.action === "outbox_recover") {
     await rpc("recover_provider_outbox", {
       p_id: c.id,
@@ -314,57 +353,145 @@ export async function activationAction(
       !s.entities.some(
         (e) => e.kind === "launch_plan" && e.data.name === "Brand Launch V1",
       )
-    )
+    ) {
+      const concept =
+        "I built an AI newsroom for my personal brand, but I deliberately refused to let AI become the creator.";
+      const brand = s.entities.find(
+        (e) => e.kind === "brand" && e.data.status === "active",
+      );
+      const titles = [
+        "INTRO / MANIFESTO",
+        "BUILD WITH ME — BrainOS",
+        "AI RIGHT NOW",
+        "I TESTED IT",
+        "AI AT WORK",
+        "MY TAKE",
+        "EDITORIAL CAROUSEL",
+        "NEWSLETTER ISSUE 0",
+      ];
+      const slots = titles.map((title, n) => {
+        const content = add("content", {
+          title,
+          pillar: title,
+          purpose:
+            n === 0
+              ? concept
+              : "Launch slot; Daniel must select the evidence and angle",
+          platform: n === 7 ? "beehiiv" : n === 6 ? "instagram" : "youtube",
+          format: n === 7 ? "newsletter" : n === 6 ? "carousel" : "video",
+          language: brand?.data.language ?? "es",
+          angle_id: null,
+          take_id: null,
+          owner: actor,
+          content_state: "planned",
+          production_state: n < 6 ? "recording_needed" : "not_required",
+          distribution_state: "not_ready",
+          analytics_state: "pending",
+          draft_revision: null,
+          production_id: null,
+          fresh_until: null,
+          evergreen: false,
+          claims_reviewed_at: null,
+          revalidation_required: true,
+          final_approval: null,
+          quality_issues: [],
+          status: "draft",
+          platform_shells: platforms.map((platform) => ({
+            platform,
+            status: "SCRIPT_REVISION_REQUIRED",
+            package_id: null,
+          })),
+          ...(n === 0
+            ? {
+                build_references: [
+                  {
+                    kind: "implementation",
+                    path: "src/control/service.ts",
+                    claim: "Human approval gates",
+                  },
+                  {
+                    kind: "implementation",
+                    path: "src/production/model.ts",
+                    claim: "Exact production revisions",
+                  },
+                  {
+                    kind: "implementation",
+                    path: "src/integrations/personal-drive.ts",
+                    claim: "Personal-only Drive scope",
+                  },
+                ],
+                visual_beats: [
+                  "Morning Brief",
+                  "Evidence and claims",
+                  "Suggested angle vs human approval",
+                  "Script revision",
+                  "Production Studio",
+                  "Platform package",
+                ],
+                recording_requirements: [
+                  "Daniel on camera",
+                  "Screen recording from /recording-demo (fictional fixtures)",
+                  "Daniel selects and verifies the demonstrated behavior",
+                ],
+                b_roll: [
+                  "Hands at keyboard",
+                  "BrainOS screen capture",
+                  "Local worker status without terminal credentials",
+                ],
+                production_checklist: [
+                  "Choose exact angle",
+                  "Approve script revision",
+                  "Record",
+                  "Transcribe",
+                  "Review edit plan",
+                  "Clear assets",
+                  "Render",
+                  "Approve exact final output",
+                ],
+              }
+            : {}),
+        });
+        return {
+          title,
+          content_id: content.id,
+          status: "HUMAN_SELECTION_REQUIRED",
+        };
+      });
+      const campaign = add("campaign", {
+        name: "Brand Launch V1",
+        content_ids: slots.map((s) => s.content_id),
+        created_by: actor,
+        created_at: new Date().toISOString(),
+      });
       add("launch_plan", {
         name: "Brand Launch V1",
-        slots: [
-          "INTRO / MANIFESTO",
-          "BUILD WITH ME — BrainOS",
-          "AI RIGHT NOW",
-          "I TESTED IT",
-          "AI AT WORK",
-          "MY TAKE",
-          "EDITORIAL CAROUSEL",
-          "NEWSLETTER ISSUE 0",
-        ].map((title) => ({
-          title,
-          content_id: null,
-          status: "CONTENT_SELECTION_REQUIRED",
-        })),
+        campaign_id: campaign.id,
+        slots,
         intro: {
-          concept:
-            "I built an AI newsroom for my personal brand, but I deliberately refused to let AI become the creator.",
+          concept,
           status: "draft_structure",
           final_script: null,
           approved: false,
-          evidence: [
-            "Human editorial gates",
-            "Exact approved revisions",
-            "Rights controls",
-            "Personal Drive/local worker",
-          ],
-          visual_beats: [
-            "Morning Brief",
-            "Evidence and claims",
-            "Suggested angle vs human approval",
-            "Script revision",
-            "Production Studio",
-            "Platform package",
-          ],
-          recording_requirements: [
-            "Daniel on camera",
-            "Screen recording in labelled demo mode",
-            "Mask private notes and identifiers",
-          ],
-          checklist: [
-            "Daniel selects angle",
-            "Daniel approves exact script",
-            "Record",
-            "Clear assets",
-            "Review exact final output",
-          ],
         },
+        capture_map: [
+          { screen: "Morning Brief", href: "/recording-demo#brief" },
+          { screen: "Evidence/claims", href: "/recording-demo#evidence" },
+          {
+            screen: "Angle suggestion vs approval",
+            href: "/recording-demo#angle",
+          },
+          { screen: "Exact script", href: "/recording-demo#script" },
+          {
+            screen: "Drive / Production / worker",
+            href: "/recording-demo#production",
+          },
+          {
+            screen: "Package / analytics",
+            href: "/recording-demo#distribution",
+          },
+        ],
       });
+    }
   }
   await rpc("commit_control", {
     p_epoch: s.epoch,

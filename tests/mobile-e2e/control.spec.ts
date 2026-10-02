@@ -14,6 +14,13 @@ test("mobile editorial controls, action queue, production and launch stay usable
     "/production/studio",
     "/workbench?tab=launch",
     "/about",
+    "/activation",
+    "/operations-center",
+    "/opportunities",
+    "/contact",
+    "/privacy",
+    "/terms",
+    "/recording-demo",
   ]) {
     await page.goto(path);
     await expect(page.locator("h1,h2").first()).toBeVisible();
@@ -43,4 +50,43 @@ test("public consent intake works and does not reveal private records", async ({
   await expect(page.getByRole("status")).toContainText("Consent saved");
   await page.getByRole("button", { name: "Retirar consentimiento" }).click();
   await expect(page.getByRole("status")).toContainText("retirado");
+});
+
+test("activation, safe demo, PNG share and install manifest have safe boundaries", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/activation");
+  await expect(
+    page.getByRole("heading", { name: "Account Activation" }),
+  ).toBeVisible();
+  await page.goto("/recording-demo");
+  await expect(page.getByText("DEMO / FICTIONAL FIXTURES")).toBeVisible();
+  const body = await page.locator("body").innerText();
+  expect(body).not.toMatch(
+    /@[a-z0-9.-]+\.[a-z]+|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i,
+  );
+  const og = await request.get("/api/public/share");
+  expect(og.headers()["content-type"]).toContain("image/png");
+  expect((await og.body()).subarray(1, 4).toString()).toBe("PNG");
+  const manifest = await (await request.get("/manifest.webmanifest")).json();
+  expect(manifest.display).toBe("standalone");
+  await page.goto("/contact");
+  await page.getByLabel("Nombre", { exact: true }).fill("DEMO request");
+  await page
+    .getByLabel("Email", { exact: true })
+    .fill("demo-intake@example.com");
+  await page
+    .getByLabel("Problema, caso de uso o invitación")
+    .fill("Clearly fictional testing request");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Enviar solicitud" }).click();
+  await expect(page.getByRole("status")).toContainText("guardada");
+  await page.goto("/about");
+  expect(await page.locator("body").innerText()).not.toContain(
+    "demo-intake@example.com",
+  );
+  expect(
+    await page.locator('meta[name="robots"]').getAttribute("content"),
+  ).toContain("noindex");
 });

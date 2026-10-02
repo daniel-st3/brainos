@@ -12,6 +12,28 @@ export async function GET(
     const { id } = await params,
       s = await readControl(await applicationRpc(), dataMode() === "demo"),
       g = s.entities.find((e) => e.kind === "graphic" && e.id === id);
+    if (new URL(request.url).searchParams.get("format") === "manifest") {
+      const { orderedCarousel } = await import("@/providers/carousel");
+      const exported = await orderedCarousel(
+        await applicationRpc(),
+        id,
+        dataMode() === "demo",
+      );
+      return NextResponse.json(
+        {
+          graphic_id: id,
+          revision: exported.graphic.version,
+          template_version: exported.graphic.data.template_version,
+          rights: exported.graphic.data.rights,
+          slides: exported.slides.map(({ bytes, ...s }) => ({
+            ...s,
+            bytes: bytes.length,
+            download: `/api/control/graphics/${id}?slide=${s.order - 1}&format=png`,
+          })),
+        },
+        { headers: { "Cache-Control": "private,no-store" } },
+      );
+    }
     const index = Number(new URL(request.url).searchParams.get("slide") ?? 0);
     if (!Number.isInteger(index) || index < 0 || !g)
       throw Error("Graphic missing");
