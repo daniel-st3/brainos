@@ -36,6 +36,12 @@ export async function GET(
       ),
     );
   } catch {
+    try {
+      const actor = await editor(),
+        rpc = await applicationRpc();
+      const { recordOAuthFailure } = await import("@/providers/auth");
+      await recordOAuthFailure(rpc, p, actor);
+    } catch {}
     return NextResponse.json(
       {
         error:

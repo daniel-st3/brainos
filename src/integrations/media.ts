@@ -71,7 +71,8 @@ export async function storeArtifact(
   // An uploaded object is not editorial clearance. No asset publishable flag changes here.
   return { id, provider: "supabase", bucket, fileId: path, publishable: false };
 }
-export async function driveToken() {
+export type SavedDriveConnection = { encrypted_refresh_token: string };
+export async function driveToken(savedConnection?: SavedDriveConnection) {
   personalDriveConfiguration();
   const clientId = process.env.GOOGLE_CLIENT_ID,
     clientSecret = process.env.GOOGLE_CLIENT_SECRET,
@@ -80,9 +81,11 @@ export async function driveToken() {
   if (!refreshToken && process.env.CONTENT_OS_MODE === "supabase") {
     const { applicationRpc } = await import("../ingestion/store");
     const { openSecret } = await import("./google-oauth");
-    const connection = (await (
-      await applicationRpc()
-    )("read_google_connection")) as { encrypted_refresh_token: string } | null;
+    const connection =
+      savedConnection ??
+      ((await (
+        await applicationRpc()
+      )("read_google_connection")) as SavedDriveConnection | null);
     if (connection)
       refreshToken = openSecret(connection.encrypted_refresh_token, "refresh");
   }

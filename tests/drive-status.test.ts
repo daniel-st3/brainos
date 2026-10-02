@@ -41,6 +41,10 @@ it("only reports connected after a runtime check and never returns credentials",
     root: personalDriveRoot,
   });
   expect(driveToken).toHaveBeenCalledOnce();
+  expect(driveToken).toHaveBeenCalledWith({
+    encrypted_refresh_token: "private-ciphertext",
+  });
+  expect(rpc).toHaveBeenCalledExactlyOnceWith("read_google_connection");
 });
 it("does not show connected for a revoked token or failed folder check", async () => {
   const rpc = vi

@@ -851,8 +851,9 @@ export class OfficialClient {
   }
   async revoke() {
     const p = this.provider;
+    let response: Response | undefined;
     if (p === "youtube") {
-      await this.send("https://oauth2.googleapis.com/revoke", {
+      response = await this.send("https://oauth2.googleapis.com/revoke", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -862,21 +863,24 @@ export class OfficialClient {
       });
     } else if (p === "tiktok") {
       const c = appConfig(p);
-      await this.send("https://open.tiktokapis.com/v2/oauth/revoke/", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_key: c.clientId,
-          client_secret: c.clientSecret,
-          token: this.tokens.access_token,
-        }),
-        signal: AbortSignal.timeout(15000),
-      });
+      response = await this.send(
+        "https://open.tiktokapis.com/v2/oauth/revoke/",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_key: c.clientId,
+            client_secret: c.clientSecret,
+            token: this.tokens.access_token,
+          }),
+          signal: AbortSignal.timeout(15000),
+        },
+      );
     } else if (p === "instagram")
       await this.request("/me/permissions", "DELETE");
     else if (p === "x") {
       const c = appConfig(p);
-      await this.send("https://api.x.com/2/oauth2/revoke", {
+      response = await this.send("https://api.x.com/2/oauth2/revoke", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -888,6 +892,12 @@ export class OfficialClient {
         }),
         signal: AbortSignal.timeout(15000),
       });
+    }
+    if (response) {
+      const result = obj(await response.json().catch(() => ({}))),
+        error = obj(result.error);
+      if (!response.ok || (error.code && error.code !== "ok"))
+        throw new ProviderError("REMOTE_REVOCATION_FAILED");
     }
   }
 }

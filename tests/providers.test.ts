@@ -1020,3 +1020,35 @@ it("TikTok uses checkpointed official FILE_UPLOAD without requiring a public del
     status: "upload_pending",
   });
 });
+it("OAuth callback failures persist a sanitized deduplicated operational notification", async () => {
+  const { recordOAuthFailure } = await import("../src/providers/auth");
+  await recordOAuthFailure(rpc, "tiktok", "Daniel demo");
+  await recordOAuthFailure(rpc, "tiktok", "Daniel demo");
+  const s = await readControl(rpc, false),
+    errors = s.entities.filter(
+      (e) => e.kind === "notification" && e.data.type === "oauth_failure",
+    );
+  expect(errors).toHaveLength(1);
+  expect(JSON.stringify(errors)).not.toMatch(
+    /access_token|refresh_token|code=/,
+  );
+});
+for (const provider of ["youtube", "tiktok", "x"] as const) {
+  it(`${provider}: rejected remote revocation cannot be reported as success`, async () => {
+    vi.stubEnv("CONTENT_OS_ORIGIN", "https://brainos.example");
+    vi.stubEnv("TIKTOK_CLIENT_ID", "fixture-client");
+    vi.stubEnv("TIKTOK_CLIENT_SECRET", "fixture-secret");
+    vi.stubEnv("X_CLIENT_ID", "fixture-client");
+    vi.stubEnv("X_CLIENT_SECRET", "fixture-secret");
+    const send = vi.fn(async () =>
+      json(
+        { error: { code: "invalid_token", message: token.access_token } },
+        400,
+      ),
+    );
+    await expect(
+      new OfficialClient(provider, token, send).revoke(),
+    ).rejects.toMatchObject({ code: "REMOTE_REVOCATION_FAILED" });
+    expect(send).toHaveBeenCalledOnce();
+  });
+}

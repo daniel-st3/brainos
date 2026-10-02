@@ -3,7 +3,7 @@ import { publicAttribution } from "../providers/attribution";
 import { randomUUID } from "node:crypto";
 import type { Rpc } from "../ingestion/store";
 import type { Story } from "../domain/types";
-import { studio } from "../production/service";
+import { studio, validateStudio } from "../production/service";
 import type { StudioState } from "../production/types";
 import { controlCommand } from "./commands";
 import {
@@ -43,12 +43,13 @@ export async function readControl(rpc: Rpc, demo: boolean) {
   };
 }
 export async function controlSnapshot(rpc: Rpc, demo: boolean) {
-  const [state, allStories, production] = await Promise.all([
+  const [state, allStories, productionState] = await Promise.all([
     readControl(rpc, demo),
     rpc("read_newsroom") as Promise<Story[]>,
-    studio(rpc),
+    rpc("read_production") as Promise<StudioState>,
   ]);
-  const stories = allStories.filter((s) => s.is_demo === demo),
+  const production = validateStudio(productionState, allStories),
+    stories = allStories.filter((s) => s.is_demo === demo),
     ids = new Set(stories.map((s) => s.id)),
     packages = production.packages.filter((p) => ids.has(p.story_id)),
     pids = new Set(packages.map((p) => p.id));
@@ -187,6 +188,10 @@ export function readiness(
     const output = production.packages.find(
       (p) => p.id === content.data.production_id,
     )?.data.output;
+    if (output && !content.is_demo && !output.probe)
+      issues.push(
+        "FFPROBE_VALIDATION_REQUIRED · validate or re-render this exact output",
+      );
     if (output && output.options.layout !== "vertical")
       issues.push("Short-video package requires verified vertical 9:16 output");
     if (output && output.duration > 180)

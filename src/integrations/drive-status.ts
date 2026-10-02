@@ -1,6 +1,6 @@
 import type { Rpc } from "../ingestion/store";
 import { oauthConfiguration } from "./google-oauth";
-import { driveToken } from "./media";
+import { driveToken, type SavedDriveConnection } from "./media";
 import { personalDriveConfiguration } from "./personal-drive";
 
 export type DriveConnectionStatus =
@@ -17,10 +17,12 @@ export async function driveConnectionStatus(
     return { state: "unconfigured" };
   }
   try {
-    const connection = await rpc("read_google_connection");
+    const connection = (await rpc(
+      "read_google_connection",
+    )) as SavedDriveConnection | null;
     if (!connection) return { state: "disconnected" };
     // A saved row alone does not prove an unrevoked credential or folder access.
-    await driveToken();
+    await driveToken(connection);
     const { email, root } = personalDriveConfiguration();
     return { state: "connected", email, root };
   } catch {

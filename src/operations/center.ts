@@ -26,6 +26,22 @@ export async function operationsCenter(rpc: Rpc, demo: boolean) {
       ...state.entities
         .filter(
           (e) =>
+            e.kind === "notification" &&
+            e.data.type === "oauth_failure" &&
+            !e.data.read_at,
+        )
+        .map((e) => ({
+          id: e.id,
+          subsystem: "OAuth",
+          error: String(e.data.title),
+          status: "unread",
+          attempts: 1,
+          href: "/activation",
+          recovery: "none",
+        })),
+      ...state.entities
+        .filter(
+          (e) =>
             e.kind === "account" &&
             ["degraded", "auth_required", "revoked"].includes(
               String(e.data.status),

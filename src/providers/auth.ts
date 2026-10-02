@@ -423,3 +423,40 @@ export async function disconnectProvider(
     p_actor: actor,
   });
 }
+
+/** No callback URL, authorization code or provider error body enters the audit. */
+export async function recordOAuthFailure(rpc: Rpc, p: Provider, actor: string) {
+  const state = await readControl(rpc, false),
+    key = `oauth-failure:${p}:${Math.floor(Date.now() / 600000)}`;
+  if (
+    state.entities.some((e) => e.kind === "notification" && e.data.key === key)
+  )
+    return;
+  await rpc("commit_control", {
+    p_epoch: state.epoch,
+    p_entities: [
+      {
+        id: randomUUID(),
+        kind: "notification",
+        version: 1,
+        story_id: null,
+        draft_id: null,
+        parent_id: null,
+        is_demo: false,
+        data: {
+          key,
+          type: "oauth_failure",
+          subsystem: "OAuth",
+          title: `${p}: authorization callback failed`,
+          href: "/activation",
+          status: "unread",
+          read_at: null,
+          created_at: new Date().toISOString(),
+        },
+      },
+    ],
+    p_jobs: [],
+    p_public: [],
+    p_actor: actor,
+  });
+}

@@ -12,8 +12,17 @@ import {
   acceptTranscript,
 } from "./model";
 export async function studio(rpc: Rpc): Promise<StudioState> {
-  const state = (await rpc("read_production")) as StudioState,
-    stories = (await rpc("read_newsroom")) as Story[];
+  const [state, stories] = await Promise.all([
+    rpc("read_production") as Promise<StudioState>,
+    rpc("read_newsroom") as Promise<Story[]>,
+  ]);
+  return validateStudio(state, stories);
+}
+/** Validate against the same story snapshot already loaded by the control plane. */
+export function validateStudio(
+  state: StudioState,
+  stories: Story[],
+): StudioState {
   for (const p of state.packages) {
     try {
       const s = stories.find((s) => s.id === p.story_id);

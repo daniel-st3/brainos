@@ -44,6 +44,15 @@ beforeAll(async () => {
   await run({ action: "brand_approve", id: b.id, confirmed: true });
 }, 30000);
 afterAll(async () => db.close());
+it("loads one newsroom snapshot for control and production validation", async () => {
+  const calls: string[] = [];
+  await controlSnapshot(async (name, args) => {
+    calls.push(name);
+    return rpc(name, args);
+  }, true);
+  expect(calls.filter((name) => name === "read_newsroom")).toHaveLength(1);
+  expect(calls.filter((name) => name === "read_production")).toHaveLength(1);
+});
 async function fixture(platform = "x", format = "post") {
   const snap = await controlSnapshot(rpc, true),
     s = snap.stories.find((s) => s.status === "approved")!;
