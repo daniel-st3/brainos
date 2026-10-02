@@ -894,3 +894,40 @@ it("an old cover cannot silently accompany changed platform headline copy", asyn
     readiness(c, state, snap.stories, snap.production, p.id).issues.join(" "),
   ).toContain("Cover headline differs");
 });
+it("custom voice rules preserve complete SQL excerpts even with internal capture groups", async () => {
+  const b = await run({
+    action: "brand_save",
+    name: "DEMO custom rule",
+    positioning: "Evidence first",
+    audience: "Operators",
+    pillars: ["AI at work"],
+    tone: ["Specific"],
+    cta: "Inspect",
+    banned_patterns: ["No es (magia), es trabajo\\."],
+  });
+  await run({ action: "brand_approve", id: b.id, confirmed: true });
+  const snap = await controlSnapshot(rpc, true),
+    s = snap.stories.find((s) => s.status === "scheduled")!,
+    d = s.drafts.find((d) => d.id === s.active_draft_id)!;
+  const changed = await applyCommand(
+    s,
+    {
+      type: "edit_draft",
+      draftId: d.id,
+      hook: d.hook,
+      body: "DEMO: No es magia, es trabajo.",
+      cta: d.cta,
+      shotNotes: d.shot_notes,
+      assetIds: d.asset_ids,
+    },
+    "DEMO editor",
+  );
+  await rpc("save_story", { p_story: changed, p_expected_version: s.version });
+  const state = await readControl(rpc, true),
+    runRecord = state.entities.find(
+      (e) => e.kind === "quality" && e.draft_id === changed.active_draft_id,
+    )!;
+  expect((runRecord.data.issues as { excerpt: string }[])[0].excerpt).toBe(
+    "No es magia, es trabajo.",
+  );
+});
