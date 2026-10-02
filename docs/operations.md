@@ -12,13 +12,13 @@ Codex can inspect Supabase/Vercel and manage Drive folders using connectors. The
 4. Run `npm run runtime:check` with runtime environment loaded. It verifies RPCs, anonymous denial and the editor identity. Run `npm run storage:setup` to create a private 10 MB bucket and verify upload/download/delete. This is repeatable, and refuses an existing public bucket.
 5. Link a **new** Vercel `brainos` project, then `vercel deploy` (preview only). Never use `--prod` without approval. No preview exists until deployment succeeds; connector read access alone cannot deploy.
 
-## Scheduling: GitHub Actions only
+## Scheduling: Supabase Cron only
 
-GitHub Actions is the selected primary scheduler because its hosted runtime and CI are already verified; no Trigger credentials are configured. `.github/workflows/newsroom.yml` runs at **06:30 America/Bogota daily**, equivalent to **11:30 UTC** (Colombia has no DST). It requires repository variable `NEWSROOM_SCHEDULER=github`, URL variable `NEXT_PUBLIC_SUPABASE_URL`, and Actions secret `SUPABASE_SECRET_KEY`. Until those runtime settings are populated, the job remains disabled. Concurrency prevents overlapping workflow runs and the database ingestion lease protects other callers. Source failures persist in the database and fail the ingestion step; the operations step still runs against successfully stored data.
+Supabase Cron is the sole scheduled authority. Discovery runs at **06:30 America/Bogota daily**, equivalent to **11:30 UTC** (Colombia has no DST); operations runs hourly at minute 17 and does not rerun discovery. `scripts/setup-automation.ts` installs the two jobs and stores the executor bearer/origin/deployment bypass in Vault. Browser roles cannot invoke the dispatcher. Expiring automation and ingestion leases prevent overlapping execution; source failures persist and fail the discovery lane after operations have run.
 
-GitHub recurring schedules execute on the default branch, currently `codex/automated-newsroom`, the repository's only branch. No separate main/stable branch was found. No default-branch change or merge was performed. Manual `workflow_dispatch` remains available. GitHub can delay scheduled starts; this is not a guaranteed-to-the-minute scheduler. Trigger's `morning-discovery`, ingestion and worker tasks remain manual entry points only, with **no Trigger cron registered**. No Vercel or Supabase cron is added.
+`.github/workflows/newsroom.yml` retains manual `workflow_dispatch` recovery, with no scheduled trigger or scheduler-variable guard. `NEWSROOM_SCHEDULER=supabase` records the selected authority. No default-branch change or merge was performed. There is no Vercel or Trigger cron. Expected-window health in `/operations-center` counts scheduled events separately: manual success never clears a missed scheduled event. Missing, stale or failed runs remain visible.
 
-Manual verification: `CONTENT_OS_MODE=supabase CONTENT_OS_DATA_MODE=live npm run ingest`, followed by `npm run operations`. Inspect `/sources` and authenticated `GET /api/operations`. Job claims use expiring leases, fenced completion, bounded attempts, delayed retries, idempotency keys and visible blocked/failed states. Worker crashes are reclaimable. No social publication happens in any worker.
+Manual recovery uses `scripts/automation.ts` with the private live environment, or the GitHub manual workflow. Inspect `/sources`, `/operations-center` and authenticated `GET /api/control/health`. Job claims use expiring leases, fenced completion, bounded attempts, delayed retries, idempotency keys and visible blocked/failed states. Worker crashes are reclaimable. External publication and subscriber synchronization remain disabled in the preview.
 
 ## Enrichment and drafts
 
@@ -30,11 +30,10 @@ Explicit opinion memory: authenticated same-origin `POST /api/operations` with `
 
 ## Media and production
 
-Drive root created and read back through the connector:
-`<private-approved-personal-root>` — personal Daniel AI Content OS, accessed by `<private-approved-personal-email>`.
+Use the existing personal Daniel AI Content OS root, configured only through private runtime variables. Do not create duplicate folders or reference the retired work root.
 
 `GOOGLE_DRIVE_ACCOUNT_EMAIL=<private-approved-personal-email>` is required. Runtime authorization verifies this account before accessing the root, and rejects folders without write access and media outside its descendants.
-Children: Inbox, Stories, Recordings, Assets, Exports, Published, Archive.
+The configured root and account SHA256 fingerprints must match the approved private values before any Google request is sent. Runtime authorization checks the account, folder identity and write capability; it does not require ownership.
 
 Runtime Drive upload requires a dedicated Google OAuth web client configured with the exact redirect URI `${CONTENT_OS_ORIGIN}/api/integrations/google/callback`. The editor opens `${CONTENT_OS_ORIGIN}/api/integrations/google/start`. The callback uses PKCE, encrypted expiring state bound to the editor, a Secure/HttpOnly/SameSite cookie, and an authenticated session. It verifies write access to the **existing** root folder before storing the refresh token with AES-256-GCM in the private `runtime_connections` table. `INTEGRATION_ENCRYPTION_KEY` is a random 32-byte runtime secret, stored separately from the database. Do not rotate it without re-encrypting existing credentials or reauthorizing.
 
@@ -46,13 +45,13 @@ Large recordings can be uploaded directly to Drive; `media_objects` retains prov
 
 `GET /api/production?draft=<uuid>&draft=<uuid>` returns a batch of exact approved scripts, hook, duration, notes, shot/asset checklist and evidence references. Add `format=text` for teleprompter export. Superseded/unapproved revisions or unclear assets fail. `?publication=<uuid>` exports the validated internally scheduled handoff without calling a publisher.
 
-The post-recording provider interface covers timestamped transcription and edit-decision proposals. Queued tasks are marked blocked until a local ffmpeg/Whisper worker exists. No transcription/rendering is falsely reported as complete.
+The authenticated local ffmpeg/Whisper worker handles timestamped transcription, deterministic edit plans and rendering. The Mac login service keeps a singleton worker, backs off when unavailable, rotates logs and holds a power assertion only during active jobs. Readiness requires a recent heartbeat. Live final video packages require an actual worker probe (ffprobe when available, otherwise PyAV/libavformat), codec/container/duration/dimensions/size checks and exact human approval.
 
 ## Publishing, newsletter, analytics, Google intake
 
-Official publishing adapter interfaces cover X, Instagram, YouTube and newsletter providers. **No sending adapter or publish HTTP route is enabled.** Approval and rights are revalidated at handoff. `newsletter_issues` and `newsletter_sections` retain exact draft/story references; `newsletterIssue` assembles validated approved sections for review. Provider publishing requires future authorization and testing.
+Official clients implement Instagram, TikTok, X, YouTube and beehiiv publishing and analytics. Shared OAuth (API-key installation for beehiiv), encrypted token lifecycle, account selection/capability checks and an immutable distribution outbox are implemented. **Live external writes remain disabled.** Exact approvals, rights, account binding, freshness and media constraints are revalidated before dispatch. Ambiguous writes enter reconciliation instead of blind retry. Provider contracts and the same-path simulator are tested; real provider verification still requires developer application/access and connected accounts. See [provider activation](provider-activation.md).
 
-Analytics jobs target +24h/+72h/+7d after a recorded actual publication event, never scheduled time. Provider adapters retain raw metrics in immutable `analytics_snapshots` with unique publication/provider/window identity. Unconfigured adapters become `blocked`, not fake successful zero metrics. X/Instagram/TikTok/YouTube/newsletter interfaces exist; none currently collect live data.
+Analytics jobs target exact +24h/+72h/+7d due times after a recorded publication event, never scheduled time. The hourly operations tick claims due work and persists start/capture time and lateness. Official clients retain raw responses and provider-specific metric semantics; synthetic responses are explicitly labelled demo. Missing access becomes blocked, not successful zero metrics. No live social account metrics have been verified yet.
 
 Gmail connector inspection found no messages in a limited recent AI-newsletter query. The runtime read-only intake boundary is opt-in, label-scoped and disabled during the pilot. It requires separate `gmail.readonly` OAuth consent. It cannot elevate newsletter text to primary evidence or change the source registry. No emails/notifications are sent. Calendar is only a recording-block interface; no events are created.
 
