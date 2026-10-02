@@ -1,3 +1,4 @@
+import { driveConnectionStatus } from "@/integrations/drive-status";
 import { editor } from "@/server/auth";
 import { readStories } from "@/server/repository";
 import { applicationRpc } from "@/ingestion/store";
@@ -7,9 +8,11 @@ import { PageHeader } from "@/components/ui";
 export const dynamic = "force-dynamic";
 export default async function Studio() {
   await editor();
-  const [state, stories] = await Promise.all([
-    studio(await applicationRpc()),
+  const rpc = await applicationRpc();
+  const [state, stories, driveStatus] = await Promise.all([
+    studio(rpc),
     readStories(),
+    driveConnectionStatus(rpc),
   ]);
   const allowed = new Set(stories.map((s) => s.id));
   state.packages = state.packages.filter((p) => allowed.has(p.story_id));
@@ -23,13 +26,7 @@ export default async function Studio() {
       <ProductionStudio
         initial={state}
         stories={stories}
-        driveConfigured={Boolean(
-          process.env.GOOGLE_CLIENT_ID &&
-          process.env.GOOGLE_CLIENT_SECRET &&
-          process.env.GOOGLE_DRIVE_ROOT_ID &&
-          process.env.INTEGRATION_ENCRYPTION_KEY &&
-          process.env.CONTENT_OS_ORIGIN,
-        )}
+        driveStatus={driveStatus}
       />
     </>
   );

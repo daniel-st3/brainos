@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import type { DriveConnectionStatus } from "@/integrations/drive-status";
 import Link from "next/link";
 import type { Story } from "@/domain/types";
 import type {
@@ -14,12 +16,13 @@ const href = (p: ProductionPackage, format: string) =>
 export function ProductionStudio({
   initial,
   stories,
-  driveConfigured,
+  driveStatus,
 }: {
   initial: StudioState;
   stories: Story[];
-  driveConfigured: boolean;
+  driveStatus: DriveConnectionStatus;
 }) {
+  const router = useRouter();
   const [state, setState] = useState(initial),
     [selected, setSelected] = useState<string[]>([]),
     [active, setActive] = useState(initial.packages[0]?.id ?? ""),
@@ -37,6 +40,7 @@ export function ProductionStudio({
       ids.has(p.story_id),
     );
     setState(d);
+    router.refresh();
   }
   async function request(body: unknown) {
     const r = await fetch(endpoint, {
@@ -133,8 +137,25 @@ export function ProductionStudio({
         >
           Actualizar estados
         </button>
-        {driveConfigured ? (
+        {driveStatus.state === "connected" ? (
+          <span role="status" data-testid="drive-connection-status">
+            <strong>Drive connected</strong> · {driveStatus.email}
+            {" · "}
+            <a
+              href={`https://drive.google.com/drive/folders/${driveStatus.root}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Daniel AI Content OS
+            </a>
+          </span>
+        ) : driveStatus.state === "disconnected" ? (
           <Link href="/api/integrations/google/start">Conectar Drive</Link>
+        ) : driveStatus.state === "unavailable" ? (
+          <span role="status">
+            No se pudo verificar Drive. Actualiza los estados para reintentar.{" "}
+            <Link href="/api/integrations/google/start">Reconectar Drive</Link>
+          </span>
         ) : (
           <span>
             Drive pendiente de configuración OAuth. Puedes subir o registrar
