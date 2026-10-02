@@ -6,7 +6,11 @@ export function sameOrigin(request: Request) {
     return (
       ["http:", "https:"].includes(url.protocol) &&
       (process.env.CONTENT_OS_ORIGIN
-        ? url.origin === process.env.CONTENT_OS_ORIGIN
+        ? url.origin === process.env.CONTENT_OS_ORIGIN ||
+          (url.host === request.headers.get("host") &&
+            [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]
+              .filter(Boolean)
+              .includes(url.host))
         : url.host === request.headers.get("host")) &&
       request.headers.get("sec-fetch-site") !== "cross-site"
     );

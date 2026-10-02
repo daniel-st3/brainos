@@ -18,7 +18,9 @@
     "operations": "tsx scripts/operations.ts",
     "storage:setup": "tsx scripts/setup-storage.ts",
     "runtime:check": "tsx scripts/check-runtime.ts",
-    "production:setup": "tsx scripts/setup-production.ts"
+    "production:setup": "tsx scripts/setup-production.ts",
+    "backup": "tsx scripts/backup-control.ts",
+    "backup:restore-local": "tsx scripts/backup-control.ts restore-local"
   },
   "engines": {
     "node": ">=22"
