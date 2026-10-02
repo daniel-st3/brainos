@@ -62,6 +62,10 @@ export function AccountActivation({ initial }: { initial: State }) {
       </p>
       <section className="panel">
         <h2>Identidad de handles</h2>
+        <p>
+          Las propuestas son editables. No hemos comprobado disponibilidad ni
+          reservado nombres.
+        </p>
         <form
           onSubmit={(e) =>
             submit(e, (d) => ({
@@ -88,7 +92,13 @@ export function AccountActivation({ initial }: { initial: State }) {
           </label>
           <label>
             Alternativas, separadas por comas
-            <input name="fallbacks" />
+            <input
+              name="fallbacks"
+              defaultValue={(
+                (state.entities.find((e) => e.kind === "handle")?.data
+                  .fallbacks ?? []) as string[]
+              ).join(", ")}
+            />
           </label>
           <label>
             <input type="checkbox" name="available" />
@@ -351,6 +361,17 @@ export function AccountActivation({ initial }: { initial: State }) {
           .map((e) => (
             <div key={e.id}>
               <h3>{String(e.data.name)}</h3>
+              <h4>Assets de marca pendientes</h4>
+              {(
+                (e.data.asset_requirements ?? []) as {
+                  slot: string;
+                  status: string;
+                }[]
+              ).map((asset) => (
+                <p key={asset.slot}>
+                  {asset.slot} — {asset.status}
+                </p>
+              ))}
               {state.launch_slots.map((s) => (
                 <p key={s.title}>
                   {s.title} — {s.readiness.ready ? "READY" : "BLOCKED"} ·{" "}

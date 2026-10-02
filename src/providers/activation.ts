@@ -262,6 +262,7 @@ export async function activationAction(
       {
         name: c.name,
         fallbacks: c.fallbacks,
+        status: "approved_identity",
         availability_reported: c.available,
         approved_by: actor,
         approved_at: new Date().toISOString(),
@@ -286,8 +287,10 @@ export async function activationAction(
       (e) => e.kind === "brand" && e.data.status === "active",
     ) as unknown as Entity<Brand>;
     if (!b) throw Error("Approve an active brand revision first");
-    const handle = s.entities.find((e) => e.kind === "handle")?.data.name as
-      string | undefined;
+    const identity = s.entities.find((e) => e.kind === "handle");
+    if (!identity?.data.approved_at)
+      throw Error("Confirm the intended handle identity first");
+    const handle = identity.data.name as string | undefined;
     if (!handle) throw Error("Record the intended handle first");
     add(
       "profile",
@@ -349,6 +352,15 @@ export async function activationAction(
     );
   }
   if (c.action === "launch_initialize") {
+    if (!s.entities.some((e) => e.kind === "handle"))
+      add("handle", {
+        name: "danielbuildsai",
+        fallbacks: ["danielaiwork", "danielbrainos"],
+        status: "draft_candidates",
+        availability_reported: null,
+        approved_by: null,
+        approved_at: null,
+      });
     if (
       !s.entities.some(
         (e) => e.kind === "launch_plan" && e.data.name === "Brand Launch V1",
@@ -473,6 +485,19 @@ export async function activationAction(
           final_script: null,
           approved: false,
         },
+        asset_requirements: [
+          "avatar",
+          "youtube_banner",
+          "x_header",
+          "newsletter_logo",
+          "social_covers",
+        ].map((slot) => ({
+          slot,
+          status: "MISSING_HUMAN_ASSET",
+          asset_id: null,
+          rights: "unknown",
+          approved_at: null,
+        })),
         capture_map: [
           { screen: "Morning Brief", href: "/recording-demo#brief" },
           { screen: "Evidence/claims", href: "/recording-demo#evidence" },

@@ -851,6 +851,10 @@ it("launch initialization creates eight blocked content records and a real campa
   const s = await readControl(rpc, true),
     launch = s.entities.find((e) => e.kind === "launch_plan")!;
   const slots = launch.data.slots as { content_id: string }[];
+  expect(launch.data.asset_requirements).toHaveLength(5);
+  expect(JSON.stringify(launch.data.asset_requirements)).toContain(
+    "MISSING_HUMAN_ASSET",
+  );
   expect(slots).toHaveLength(8);
   for (const slot of slots) {
     const c = s.entities.find((e) => e.id === slot.content_id)!;
@@ -872,6 +876,28 @@ it("launch initialization creates eight blocked content records and a real campa
       (e) => e.kind === "launch_plan",
     ),
   ).toHaveLength(1);
+});
+it("initial activation candidates stay unapproved and do not claim handle availability", async () => {
+  await activationAction(
+    rpc,
+    { action: "launch_initialize" },
+    "controller fixture",
+    false,
+  );
+  const state = await readControl(rpc, false);
+  const handle = state.entities.find((e) => e.kind === "handle")!;
+  expect(handle.data).toMatchObject({
+    status: "draft_candidates",
+    availability_reported: null,
+    approved_by: null,
+    approved_at: null,
+  });
+  expect(state.entities.filter((e) => e.kind === "content")).toHaveLength(8);
+  expect(
+    state.entities
+      .filter((e) => e.kind === "content")
+      .every((e) => !e.data.final_approval),
+  ).toBe(true);
 });
 it("beehiiv unsubscribe uses official PATCH and nested metric names preserve semantics", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
