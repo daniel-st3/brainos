@@ -1,3 +1,4 @@
+import { validatePublicLink } from "../control/public-link";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Rpc } from "../ingestion/store";
@@ -379,7 +380,7 @@ export async function activationAction(
       a,
     );
   }
-  if (c.action === "handle")
+  if (c.action === "handle") {
     add(
       "handle",
       {
@@ -392,6 +393,21 @@ export async function activationAction(
       },
       s.entities.find((e) => e.kind === "handle"),
     );
+    for (const profile of s.entities.filter(
+      (e) => e.kind === "profile" && e.data.status === "approved",
+    ))
+      add(
+        "profile",
+        {
+          ...profile.data,
+          status: "draft",
+          approved_by: null,
+          approved_at: null,
+          invalidation_reason: "Handle revision changed; regenerate profile",
+        },
+        profile,
+      );
+  }
   if (c.action === "checklist") {
     const a = find(c.id, "account");
     add(
@@ -415,15 +431,16 @@ export async function activationAction(
       throw Error("Confirm the intended handle identity first");
     const handle = identity.data.name as string | undefined;
     if (!handle) throw Error("Record the intended handle first");
-    add(
-      "profile",
-      profileDraft(
+    add("profile", {
+      ...profileDraft(
         b,
         c.provider,
         handle,
         `${process.env.CONTENT_OS_ORIGIN ?? "https://example.invalid"}/about`,
       ),
-    );
+      source_handle_id: identity.id,
+      source_handle_revision: identity.version,
+    });
   }
   if (c.action === "profile_save") {
     const e = find(c.id, "profile");
@@ -433,6 +450,7 @@ export async function activationAction(
       );
     if (c.bio.length > definitions[e.data.platform as Provider].bio)
       throw Error("Provider bio character limit exceeded");
+    validatePublicLink(c.link);
     add(
       "profile",
       {
@@ -455,6 +473,14 @@ export async function activationAction(
           v.data.status === "active",
       );
     if (!b) throw Error("Brand revision changed; regenerate profile");
+    const identity = s.entities.find((v) => v.kind === "handle");
+    if (
+      !identity?.data.approved_at ||
+      identity.id !== e.data.source_handle_id ||
+      identity.version !== e.data.source_handle_revision
+    )
+      throw Error("Handle revision changed; regenerate profile");
+    validatePublicLink(String(e.data.link));
     add(
       "profile",
       {

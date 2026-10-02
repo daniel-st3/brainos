@@ -97,7 +97,16 @@ export function AccountActivation({ initial }: { initial: State }) {
         >
           <label>
             API key privada de Buffer
-            <input name="key" type="password" autoComplete="off" required />
+            <input
+              name="key"
+              type="password"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              minLength={10}
+              disabled={busy}
+              required
+            />
           </label>
           <button disabled={busy}>Detectar mis canales de Buffer</button>
         </form>
@@ -114,6 +123,7 @@ export function AccountActivation({ initial }: { initial: State }) {
           reservado nombres.
         </p>
         <form
+          key={`handle:${state.entities.find((e) => e.kind === "handle")?.version ?? 0}`}
           onSubmit={(e) =>
             submit(e, (d) => ({
               action: "handle",
@@ -243,6 +253,7 @@ export function AccountActivation({ initial }: { initial: State }) {
             Crear cuenta en el sitio oficial ↗
           </a>
           <form
+            key={`account:${p.account?.id ?? p.platform}:${p.account?.version ?? 0}`}
             onSubmit={(e) =>
               submit(e, (d) => ({
                 action: "created",
@@ -264,6 +275,7 @@ export function AccountActivation({ initial }: { initial: State }) {
           {p.account && (
             <>
               <form
+                key={`checklist:${p.account.id}:${p.account.version}`}
                 onSubmit={(e) =>
                   submit(e, (d) => ({
                     action: "checklist",
@@ -317,6 +329,10 @@ export function AccountActivation({ initial }: { initial: State }) {
                       type="password"
                       name="key"
                       autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      minLength={10}
+                      disabled={busy}
                       required
                     />
                   </label>
@@ -334,8 +350,17 @@ export function AccountActivation({ initial }: { initial: State }) {
                   }
                 >
                   Conectar {p.platform}
+                  {p.free_connector ? " (integración directa)" : ""}
                 </button>
               )}
+              {Array.isArray(p.account.data.choices) &&
+                p.account.data.choices.length > 0 && (
+                  <p>
+                    Selecciona el canal que BrainOS debe usar. La conexión y los
+                    envíos quedan pendientes hasta confirmar esta identidad;
+                    después debes autorizar los envíos por separado.
+                  </p>
+                )}
               {Array.isArray(p.account.data.choices) &&
                 (
                   p.account.data.choices as {
@@ -355,7 +380,7 @@ export function AccountActivation({ initial }: { initial: State }) {
                       })
                     }
                   >
-                    Usar {v.name} / {v.handle}
+                    Usar {v.name} / {v.handle} · ID: {v.id}
                   </button>
                 ))}
               <p>
@@ -429,6 +454,7 @@ export function AccountActivation({ initial }: { initial: State }) {
                 {String(p.profile.data.avatar)} · Comparación: {p.drift.status}
               </p>
               <form
+                key={`profile:${p.profile.id}:${p.profile.version}`}
                 onSubmit={(e) =>
                   submit(e, (d) => ({
                     action: "profile_save",

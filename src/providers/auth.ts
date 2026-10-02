@@ -110,7 +110,9 @@ export async function exchangeToken(
   } catch {
     throw new ProviderError("TOKEN_EXCHANGE_NETWORK_FAILED");
   }
-  const r = (await response.json()) as {
+  const r = (await response.json().catch(() => {
+    throw new ProviderError("TOKEN_EXCHANGE_INVALID_RESPONSE");
+  })) as {
     access_token?: string;
     refresh_token?: string;
     expires_in?: number;

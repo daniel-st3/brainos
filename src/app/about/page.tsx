@@ -4,12 +4,18 @@ import { NewsletterSignup } from "@/components/newsletter-signup";
 import Link from "next/link";
 export async function generateMetadata() {
   const origin = process.env.CONTENT_OS_ORIGIN;
+  const profile = (await publicRecords(await applicationRpc())).find(
+    (record) => record.kind === "profile",
+  );
+  const title = profile?.title ?? "Ideas que se pueden poner a prueba.";
+  const description =
+    profile?.description ?? "Construir, probar y mostrar AI aplicada.";
   return {
-    title: "Daniel / AI aplicada",
-    description: "Construir, probar y mostrar AI aplicada.",
+    title,
+    description,
     alternates: { canonical: origin ? `${origin}/about` : undefined },
     openGraph: {
-      title: "Daniel / AI aplicada",
+      title,
       images: [
         { url: `${origin ?? ""}/api/public/share`, width: 1200, height: 630 },
       ],
@@ -27,7 +33,7 @@ export default async function About() {
   return (
     <div className="public-site">
       <header>
-        <span className="eyebrow">DANIEL RODRIGUEZ / AI APLICADA</span>
+        <span className="eyebrow">{profile?.title ?? "AI APLICADA"}</span>
         <h1>{profile?.title ?? "Ideas que se pueden poner a prueba."}</h1>
         <p>
           {profile?.description ??

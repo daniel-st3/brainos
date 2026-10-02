@@ -251,7 +251,7 @@ export class OfficialClient {
         ),
         capabilities,
         blockers: blocks,
-        raw: r,
+        raw: {},
       };
     });
   }

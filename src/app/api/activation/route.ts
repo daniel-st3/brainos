@@ -1,3 +1,4 @@
+import { activationError } from "@/providers/activation-error";
 import { NextResponse } from "next/server";
 import { editor } from "@/server/auth";
 import { sameOrigin } from "@/server/request";
@@ -58,9 +59,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ saved: true, ...result });
     return NextResponse.json({ saved: true });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Activation failed" },
-      { status: 422 },
-    );
+    return NextResponse.json({ error: activationError(e) }, { status: 422 });
   }
 }

@@ -1,3 +1,4 @@
+import { validatePublicLink } from "./public-link";
 import { ProviderError } from "../providers/client";
 import { publicAttribution } from "../providers/attribution";
 import { constraints } from "../providers/definitions";
@@ -1384,6 +1385,7 @@ export async function controlAction(
       break;
     }
     case "link_create":
+      validatePublicLink(command.url);
       put("link", {
         title: command.title,
         url: command.url,
@@ -1434,13 +1436,7 @@ export async function controlAction(
         )
       )
         throw Error("Explicitly approved source required");
-      if (
-        command.url &&
-        /drive\.google\.com|docs\.google\.com/.test(
-          new URL(command.url).hostname,
-        )
-      )
-        throw Error("Private Drive internals cannot become public links");
+      if (command.url) validatePublicLink(command.url);
       pub.push({
         id: source.id,
         kind: command.kind,

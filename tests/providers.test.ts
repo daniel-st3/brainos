@@ -620,6 +620,25 @@ it("profile generation requires active brand/handle and approval is exact", asyn
       true,
     ),
   ).rejects.toThrow("new profile revision");
+  await activationAction(
+    rpc,
+    {
+      action: "handle",
+      name: "changedhandle",
+      fallbacks: [],
+      available: false,
+    },
+    "Daniel demo",
+    true,
+  );
+  await expect(
+    activationAction(
+      rpc,
+      { action: "profile_approve", id: p.id, confirmed: true },
+      "Daniel demo",
+      true,
+    ),
+  ).rejects.toThrow("Handle revision changed");
 });
 
 it("public opportunity consent, spam limits and PII separation", async () => {
