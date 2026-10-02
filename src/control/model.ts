@@ -144,6 +144,9 @@ export interface Package {
   thread: string[];
   source_links: string[];
   media_id: string | null;
+  duration: number | null;
+  aspect: "9:16" | "original" | null;
+  language: string;
   subtitles: string | null;
   graphic_ids: string[];
   fingerprint: string;

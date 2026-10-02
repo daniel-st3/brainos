@@ -1,3 +1,5 @@
+import { applicationRpc } from "@/ingestion/store";
+import { readControl } from "@/control/service";
 import Link from "next/link";
 import { DraftQuality } from "@/components/draft-quality";
 import { ResearchAid } from "@/components/research-aid";
@@ -38,6 +40,14 @@ export default async function StoryPage({
     { tab = "overview", brief, rank } = await searchParams;
   const story = (await newsroom()).find((s) => s.id === id);
   if (!story) notFound();
+  const decision = (
+    await readControl(await applicationRpc(), story.is_demo)
+  ).entities.find(
+    (e) =>
+      e.kind === "decision" &&
+      e.story_id === story.id &&
+      e.data.status === "editorially_rejected",
+  );
   const views = {
     overview: Overview,
     sources: Sources,
@@ -88,6 +98,12 @@ export default async function StoryPage({
           <span>{story.primary_language.toUpperCase()} primary</span>
         </div>
       </div>
+      {decision && (
+        <div className="notice">
+          EDITORIALLY REJECTED · {String(decision.data.reason)} · editorial
+          outcome, not a system failure.
+        </div>
+      )}
       <WorkflowStep story={story} />
       <nav className="tabs" aria-label="Story sections">
         {tabs.map((t) => (

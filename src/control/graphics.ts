@@ -116,3 +116,38 @@ export function renderGraphic(
     publishable: false,
   };
 }
+/** Create a new clearance-bearing file revision; creation SHA remains in provenance. */
+export function clearGraphicOutputs(
+  outputs: { svg: string; sha256: string; [key: string]: unknown }[],
+  clearance: { basis: string; scope: string; actor: string; at: string },
+) {
+  const next = outputs.map((output) => {
+    const metadata = {
+      rights: "cleared",
+      publishable: true,
+      usage_basis: clearance.basis,
+      usage_scope: clearance.scope,
+      cleared_by: clearance.actor,
+      cleared_at: clearance.at,
+      creation_sha256: output.sha256,
+    };
+    const svg = output.svg
+      .replace("DERECHOS PENDIENTES", "USO REVISADO")
+      .replace(
+        "</metadata>",
+        `</metadata><metadata id="brainos-clearance">${escapeHtml(JSON.stringify(metadata))}</metadata>`,
+      );
+    return {
+      ...output,
+      svg,
+      sha256: createHash("sha256").update(svg).digest("hex"),
+      creation_sha256: output.sha256,
+    };
+  });
+  return {
+    outputs: next,
+    sha256: createHash("sha256")
+      .update(next.map((o) => o.sha256).join(""))
+      .digest("hex"),
+  };
+}

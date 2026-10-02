@@ -3,14 +3,12 @@ test("persistent content workflow, honest launch/account blocking and real graph
   page,
 }) => {
   await page.goto("/workbench?tab=brand");
-  const brand = page
-    .locator("form")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "New brand revision",
-        exact: true,
-      }),
-    });
+  const brand = page.locator("form").filter({
+    has: page.getByRole("heading", {
+      name: "New brand revision",
+      exact: true,
+    }),
+  });
   await brand
     .getByLabel("Positioning", { exact: true })
     .fill("DEMO: applied AI, evidence first");
@@ -110,7 +108,7 @@ test("persistent content workflow, honest launch/account blocking and real graph
   const p = await command({
     action: "package_create",
     id: c.id,
-    title: "DEMO exact package",
+    title: "DEMO: measure the workflow",
     caption: "DEMO: choose a task, then define how to assess it.",
     cta: "Inspect the source",
     thread: [],

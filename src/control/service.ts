@@ -27,7 +27,11 @@ import {
   type Kind,
 } from "./model";
 import { providerAdapter } from "./providers";
-import { renderGraphic, type GraphicInput } from "./graphics";
+import {
+  renderGraphic,
+  clearGraphicOutputs,
+  type GraphicInput,
+} from "./graphics";
 export async function readControl(rpc: Rpc, demo: boolean) {
   const s = (await rpc("read_control")) as ControlState;
   return {
@@ -177,6 +181,17 @@ export function readiness(
   )
     issues.push("Approved Daniel take required");
   issues.push(...productionIssues(content, production, state));
+  if (content.data.format === "video") {
+    const output = production.packages.find(
+      (p) => p.id === content.data.production_id,
+    )?.data.output;
+    if (output && output.options.layout !== "vertical")
+      issues.push("Short-video package requires verified vertical 9:16 output");
+    if (output && output.duration > 180)
+      issues.push(
+        "Short-form output exceeds the conservative 180-second package limit",
+      );
+  }
   const pkg = packageId
     ? (state.entities.find(
         (e) => e.id === packageId && e.kind === "package",
@@ -198,6 +213,17 @@ export function readiness(
     )
       issues.push("Package brand revision changed");
     const g = graphicsFor(state, pkg.data);
+    if (
+      g.some(
+        (asset) =>
+          asset.data.template === "cover" &&
+          String((asset.data.input as GraphicInput).headline) !==
+            pkg.data.title,
+      )
+    )
+      issues.push(
+        "Cover headline differs from this platform revision; regenerate the cover",
+      );
     if (
       g.some(
         (g) =>
@@ -785,6 +811,18 @@ export async function controlAction(
         source_links: story.sources
           .filter((s) => s.is_primary)
           .map((s) => s.canonical_url),
+        duration:
+          production.packages.find((p) => p.id === c.data.production_id)?.data
+            .output?.duration ?? null,
+        aspect:
+          production.packages.find((p) => p.id === c.data.production_id)?.data
+            .output?.options.layout === "vertical"
+            ? "9:16"
+            : production.packages.find((p) => p.id === c.data.production_id)
+                  ?.data.output
+              ? "original"
+              : null,
+        language: c.data.language,
         media_id:
           production.packages.find((p) => p.id === c.data.production_id)?.data
             .output?.file_id ?? null,
@@ -857,6 +895,14 @@ export async function controlAction(
           ...g.data,
           rights: "cleared",
           publishable: true,
+          ...clearGraphicOutputs(
+            g.data.outputs as {
+              svg: string;
+              sha256: string;
+              [key: string]: unknown;
+            }[],
+            { basis: command.basis, scope: command.scope, actor, at: now },
+          ),
           basis: command.basis,
           scope: command.scope,
           cleared_by: actor,

@@ -15,14 +15,30 @@ if (action === "backup") {
       `.data/backups/${new Date().toISOString().replaceAll(":", "-")}`,
   );
   await mkdir(folder, { recursive: true, mode: 0o700 });
+  const rpc = await applicationRpc();
   const { state, stories, production } = await controlSnapshot(
-    await applicationRpc(),
+    rpc,
     dataMode() === "demo",
   );
   const file = path.join(folder, "brainos.json");
   await writeFile(
     file,
-    JSON.stringify(projectExport(state, stories, production), null, 2),
+    JSON.stringify(
+      projectExport(
+        state,
+        stories,
+        production,
+        Object.fromEntries(
+          await Promise.all(
+            ["read_operations", "read_discovery_state", "read_pilot_study"].map(
+              async (name) => [name, await rpc(name)],
+            ),
+          ),
+        ),
+      ),
+      null,
+      2,
+    ),
     { mode: 0o600 },
   );
   console.log(`Private portable snapshot saved: ${file}`);

@@ -18,6 +18,7 @@ export function projectExport(
   state: ControlState,
   stories: Story[],
   production: StudioState,
+  history: Record<string, unknown> = {},
 ) {
   let root: string | null = null;
   try {
@@ -28,6 +29,7 @@ export function projectExport(
     exported_at: new Date().toISOString(),
     scope:
       "editorial/control/production metadata; excludes credentials and subscriber PII",
+    history,
     control: state,
     stories,
     production,

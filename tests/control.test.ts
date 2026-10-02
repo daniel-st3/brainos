@@ -256,7 +256,7 @@ it("real SVG renderer has provenance, persisted outputs and checksum; rights ini
     content_id: id,
     template: "cover",
     aspect: "9:16",
-    headline: "DEMO: verify first",
+    headline: "DEMO evidence",
     text: "A proposed test, no measured outcome.",
     source_ids: [s.sources[0].id],
     slides: [],
@@ -281,6 +281,15 @@ it("real SVG renderer has provenance, persisted outputs and checksum; rights ini
   await expect(
     run({ action: "content_final", id, package_id: p, confirmed: true }),
   ).rejects.toThrow("stale");
+  const cleared = (await readControl(rpc, true)).entities.find(
+    (e) => e.id === g.id,
+  )!;
+  expect((cleared.data.outputs as { svg: string }[])[0].svg).toContain(
+    "brainos-clearance",
+  );
+  expect((cleared.data.outputs as { svg: string }[])[0].svg).toContain(
+    "USO REVISADO",
+  );
   const newer = await packageFor(id, [g.id!]);
   await run({
     action: "content_final",
@@ -600,6 +609,18 @@ it("mobile action queue is built from actual pending records", async () => {
 it("editing exact approved draft invalidates downstream readiness and recording binding", async () => {
   const { id, s } = await fixture(),
     p = await packageFor(id);
+  await run({ action: "content_final", id, package_id: p, confirmed: true });
+  await run({
+    action: "materialize_public",
+    id,
+    kind: "content",
+    title: "DEMO public approved copy",
+    description: "Demo only",
+    body: "",
+    url: null,
+    confirmed: true,
+  });
+  expect((await publicRecords(rpc, true)).some((r) => r.id === id)).toBe(true);
   const draft = s.drafts.find((d) => d.id === s.active_draft_id)!;
   const updated = await applyCommand(
     s,
@@ -626,6 +647,7 @@ it("editing exact approved draft invalidates downstream readiness and recording 
     "invalidated",
   );
   expect(c.data.final_approval).toBeNull();
+  expect((await publicRecords(rpc, true)).some((r) => r.id === id)).toBe(false);
 });
 it("quality runs persist automatically for new draft revisions and deterministic spans are useful", async () => {
   const state = await readControl(rpc, true);
@@ -789,4 +811,86 @@ it("all nine programmatic templates render real aspect-specific SVGs with proven
       );
     }
   }
+});
+it("an old cover cannot silently accompany changed platform headline copy", async () => {
+  const { renderGraphic } = await import("../src/control/graphics"),
+    snap = await controlSnapshot(rpc, true),
+    s = snap.stories.find((s) => s.status === "scheduled")!,
+    brand = snap.state.entities.find(
+      (e) => e.kind === "brand" && e.data.status === "active",
+    )!;
+  const { readiness } = await import("../src/control/service");
+  const c = {
+    id: crypto.randomUUID(),
+    kind: "content",
+    version: 1,
+    story_id: s.id,
+    draft_id: s.active_draft_id,
+    parent_id: null,
+    is_demo: true,
+    data: {
+      title: "Demo",
+      format: "post",
+      platform: "x",
+      content_state: "approved",
+      evergreen: true,
+      draft_revision: s.drafts.find((d) => d.id === s.active_draft_id)!
+        .revision,
+      take_id: null,
+      production_id: null,
+    },
+  } as Entity<Content>;
+  const draft = s.drafts.find((d) => d.id === s.active_draft_id)!;
+  const graphic = {
+    id: crypto.randomUUID(),
+    kind: "graphic",
+    version: 2,
+    story_id: s.id,
+    draft_id: draft.id,
+    parent_id: c.id,
+    is_demo: true,
+    data: {
+      template: "cover",
+      input: { headline: "Old headline" },
+      scope: "x",
+      ...renderGraphic(s, c.id, draft.revision, {
+        template: "cover",
+        aspect: "9:16",
+        headline: "Old headline",
+        text: "DEMO",
+        source_ids: [s.sources[0].id],
+        slides: [],
+      }),
+    },
+  } as Entity;
+  graphic.data.rights = "cleared";
+  graphic.data.publishable = true;
+  const p = {
+    id: crypto.randomUUID(),
+    kind: "package",
+    version: 2,
+    story_id: s.id,
+    draft_id: draft.id,
+    parent_id: c.id,
+    is_demo: true,
+    data: {
+      status: "approved",
+      title: "Changed headline",
+      caption: "DEMO",
+      thread: [],
+      content_id: c.id,
+      brand_id: brand.id,
+      brand_version: brand.version,
+      platform: "x",
+      graphic_ids: [graphic.id],
+      fingerprint: "different",
+    },
+  } as Entity;
+  const state = {
+    ...snap.state,
+    entities: [...snap.state.entities, c as unknown as Entity, graphic, p],
+  };
+  expect(
+    readiness(c, state, snap.stories, snap.production, p.id).issues.join(" "),
+  ).toContain("Cover headline differs");
 });

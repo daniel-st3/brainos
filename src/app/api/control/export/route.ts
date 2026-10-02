@@ -30,7 +30,16 @@ export async function POST(request: Request) {
       ].includes(topic)
     )
       throw Error("Unknown export");
-    const data = projectExport(state, stories, production),
+    const legacy = await Promise.all(
+      ["read_operations", "read_discovery_state", "read_pilot_study"].map(
+        (name) => rpc(name),
+      ),
+    );
+    const data = projectExport(state, stories, production, {
+        operations: legacy[0],
+        discovery: legacy[1],
+        pilot: legacy[2],
+      }),
       kind = {
         content: "content",
         publications: "publication",
