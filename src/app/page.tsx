@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { ActionQueue } from "@/components/action-queue";
+import { controlSnapshot, actions } from "@/control/service";
+import { applicationRpc } from "@/ingestion/store";
 import { dataMode } from "@/server/mode";
 import { ArrowUpRight, Newspaper, ShieldCheck, Clock3 } from "lucide-react";
 import { newsroom } from "@/server/data";
@@ -18,8 +21,20 @@ export default async function Home() {
   const all = await newsroom(),
     stories = all.filter((s) => !s.archived),
     review = stories.filter((s) => s.status === "review");
+  const queue = await controlSnapshot(
+    await applicationRpc(),
+    dataMode() === "demo",
+  );
   return (
     <>
+      <div className="mobile-actions">
+        <ActionQueue
+          items={actions(queue.state, queue.stories, queue.production).slice(
+            0,
+            8,
+          )}
+        />
+      </div>
       <PageHeader
         eyebrow="COMMAND CENTER / 01"
         title="Your editorial desk."

@@ -1,6 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
+  if (
+    ["/about", "/api/public/signup", "/api/public/unsubscribe"].includes(
+      request.nextUrl.pathname,
+    )
+  )
+    return NextResponse.next();
   // This route uses a scoped worker credential, never a browser session.
   if (request.nextUrl.pathname === "/api/production/worker")
     return NextResponse.next();

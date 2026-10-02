@@ -1,3 +1,4 @@
+import { workerIdentity, WORKER_PROTOCOL } from "@/production/protocol";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { mkdir, writeFile, stat } from "node:fs/promises";
@@ -37,6 +38,19 @@ export async function POST(request: Request) {
       return NextResponse.json(
         await currentPackage(rpc, z.uuid().parse(raw.package_id)),
       );
+    if (["claim", "heartbeat", "checkin"].includes(raw.action)) {
+      const identity = workerIdentity(raw);
+      await rpc("worker_checkin", {
+        p_id: identity.id,
+        p_protocol: WORKER_PROTOCOL,
+        p_version: identity.version,
+        p_capabilities: identity.capabilities,
+        p_active:
+          raw.action === "heartbeat" ? z.uuid().parse(raw.job_id) : null,
+      });
+      if (raw.action === "checkin")
+        return NextResponse.json({ ok: true, protocol: WORKER_PROTOCOL });
+    }
     if (raw.action === "claim") {
       const job = (await rpc("claim_production")) as MediaJob | null;
       if (!job) return NextResponse.json({ job: null });

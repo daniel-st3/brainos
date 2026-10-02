@@ -1,4 +1,5 @@
 import { commandSchema, type Command } from "./commands";
+import type { EditorialAI } from "@/services/ai";
 import { demoAI } from "@/services/ai";
 import { liveEditorial } from "@/services/live-editorial";
 import type { Draft, Story, StoryStatus } from "./types";
@@ -101,10 +102,12 @@ export async function applyCommand(
   input: Command,
   actor: string,
   now = new Date().toISOString(),
+  configuredGenerator?: EditorialAI,
 ): Promise<Story> {
   const command = commandSchema.parse(input);
   const story = structuredClone(original);
-  const generator = story.is_demo ? demoAI : liveEditorial;
+  const generator =
+    configuredGenerator ?? (story.is_demo ? demoAI : liveEditorial);
   const provenance = story.is_demo
     ? "deterministic-demo/v1"
     : "deterministic-editorial/v1";

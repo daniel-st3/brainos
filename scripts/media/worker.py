@@ -113,7 +113,7 @@ class Lease:
         def beat():
             while not self.stop.wait(30):
                 try:
-                    api({"action": "heartbeat", **self.args})
+                    api({"action": "heartbeat", **self.args, **worker_identity()})
                 except Exception as e:
                     self.error = e
                     return
@@ -371,8 +371,12 @@ def render(file, spec, work):
     return output, actual, captions
 
 
+def worker_identity():
+    return {"protocol": 1, "worker_id": os.getenv("BRAINOS_WORKER_ID", "daniel-mac"), "worker_version": "media-worker/1.1"}
+
+
 def process_one():
-    data = api({"action": "claim"})
+    data = api({"action": "claim", **worker_identity()})
     if not data["job"]:
         return False
     job = data["job"]

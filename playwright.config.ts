@@ -5,6 +5,16 @@ const livePort = demoPort + 1;
 export default defineConfig({
   projects: [
     {
+      name: "mobile-controls",
+      testDir: "tests/mobile-e2e",
+      use: {
+        baseURL: `http://localhost:${demoPort}`,
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+    {
       name: "editorial-demo",
       testDir: "tests/e2e",
       use: { baseURL: `http://localhost:${demoPort}` },
@@ -38,6 +48,7 @@ export default defineConfig({
         CONTENT_OS_MODE: "demo",
         CONTENT_OS_DATA_MODE: "demo",
         CONTENT_OS_DATA_DIR: ".data/e2e",
+        CONTENT_OS_ORIGIN: `http://localhost:${demoPort}`,
       },
       timeout: 60000,
     },
@@ -49,6 +60,7 @@ export default defineConfig({
         CONTENT_OS_MODE: "demo",
         CONTENT_OS_DATA_MODE: "live",
         CONTENT_OS_DATA_DIR: ".data/e2e-live",
+        CONTENT_OS_ORIGIN: `http://localhost:${livePort}`,
       },
       timeout: 60000,
     },

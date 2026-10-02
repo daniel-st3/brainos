@@ -18,6 +18,8 @@ const nav = [
   ["/review", "Review", ClipboardCheck],
   ["/production", "Production", Clapperboard],
   ["/publish", "Publish", Send],
+  ["/actions", "My Actions", ClipboardCheck],
+  ["/workbench", "Content Workbench", LayoutDashboard],
 ] as const;
 export function Shell({
   children,
@@ -28,6 +30,7 @@ export function Shell({
 }) {
   const pathname = usePathname(),
     [open, setOpen] = useState(false);
+  if (pathname === "/about") return <>{children}</>;
   return (
     <div className="app-shell">
       <aside className={`sidebar ${open ? "open" : ""}`}>
@@ -105,7 +108,12 @@ export function Shell({
             news, measured results, or external publishing.
           </div>
         )}
-        {!demo && <div className="demo-strip">Live source material · claims remain unverified until human review · no external publishing.</div>}
+        {!demo && (
+          <div className="demo-strip">
+            Live source material · claims remain unverified until human review ·
+            no external publishing.
+          </div>
+        )}
         <main id="main-content">{children}</main>
         <footer className="footer">
           <span>CONTENT OS / EDITORIAL WORKSPACE</span>

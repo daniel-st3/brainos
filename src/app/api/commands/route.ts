@@ -1,3 +1,9 @@
+import { brandedGenerator } from "@/control/generation";
+import { readControl } from "@/control/service";
+import { applicationRpc } from "@/ingestion/store";
+import { demoAI } from "@/services/ai";
+import { liveEditorial } from "@/services/live-editorial";
+import { sameOrigin } from "@/server/request";
 import { NextResponse } from "next/server";
 import { editor } from "@/server/auth";
 import { readStories, saveStory } from "@/server/repository";
@@ -5,18 +11,7 @@ import { requestSchema } from "@/domain/commands";
 import { applyCommand } from "@/domain/workflow";
 export async function POST(request: Request) {
   try {
-    // No cross-origin writes, including anonymous demo mode.
-    const origin = request.headers.get("origin");
-    const originUrl = origin ? new URL(origin) : null;
-    const allowed = process.env.CONTENT_OS_ORIGIN;
-    if (
-      !originUrl ||
-      !["http:", "https:"].includes(originUrl.protocol) ||
-      (allowed
-        ? originUrl.origin !== allowed
-        : originUrl.host !== request.headers.get("host")) ||
-      request.headers.get("sec-fetch-site") === "cross-site"
-    )
+    if (!sameOrigin(request))
       return NextResponse.json(
         { error: "Cross-origin request rejected." },
         { status: 403 },
@@ -46,7 +41,18 @@ export async function POST(request: Request) {
         },
         { status: 409 },
       );
-    const updated = await applyCommand(story, command, actor);
+    const state = await readControl(await applicationRpc(), story.is_demo);
+    const generator = brandedGenerator(
+      story.is_demo ? demoAI : liveEditorial,
+      state,
+    );
+    const updated = await applyCommand(
+      story,
+      command,
+      actor,
+      undefined,
+      generator,
+    );
     await saveStory(updated, expectedVersion);
     return NextResponse.json({ ok: true, version: updated.version });
   } catch (error) {

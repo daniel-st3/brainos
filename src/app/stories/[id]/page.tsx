@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DraftQuality } from "@/components/draft-quality";
 import { ResearchAid } from "@/components/research-aid";
 import { Observation } from "@/components/discovery-actions";
 import { notFound } from "next/navigation";
@@ -103,6 +104,7 @@ export default async function StoryPage({
         ))}
       </nav>
       <div className="workspace-content">
+        {tab === "drafts" && <DraftQuality story={story} />}
         <Panel story={story} />
         {tab === "research" && !story.is_demo && (
           <ResearchAid storyId={story.id} />
