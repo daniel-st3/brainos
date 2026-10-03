@@ -4,6 +4,7 @@ import { Shell } from "@/components/shell";
 import localFont from "next/font/local";
 import "./globals.css";
 import "./design-system.css";
+import "./public-presentation.css";
 const display = localFont({
   src: "./fonts/newsreader.woff2",
   variable: "--font-editorial",

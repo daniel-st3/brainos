@@ -31,7 +31,8 @@ export type Kind =
   | "handle"
   | "outbox"
   | "opportunity"
-  | "launch_plan";
+  | "launch_plan"
+  | "creative";
 export interface Entity<T = Record<string, unknown>> {
   id: string;
   kind: Kind;
@@ -45,7 +46,7 @@ export interface Entity<T = Record<string, unknown>> {
 }
 export interface Job {
   id: string;
-  kind: "distribution" | "analytics" | "graphic" | "export";
+  kind: "distribution" | "analytics" | "graphic" | "export" | "creative";
   entity_id: string;
   entity_version: number;
   is_demo: boolean;

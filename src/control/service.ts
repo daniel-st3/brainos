@@ -417,6 +417,16 @@ export async function controlAction(
   demo: boolean,
   expectedEpoch?: number,
 ): Promise<{ id?: string | null; epoch?: number; processed?: string[] }> {
+  if (
+    raw &&
+    typeof raw === "object" &&
+    "action" in raw &&
+    typeof raw.action === "string" &&
+    raw.action.startsWith("creative_")
+  ) {
+    const { creativeAction } = await import("../creative/service");
+    return creativeAction(rpc, raw, actor, demo, expectedEpoch);
+  }
   const command = controlCommand.parse(raw);
   if (!actor || actor === "local-worker") throw Error("Human editor required");
   const { state, stories, production } = await controlSnapshot(rpc, demo);
