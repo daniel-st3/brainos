@@ -8,6 +8,18 @@ import {
 const example = () =>
   JSON.parse(readFileSync("docs/examples/creative-lab-handoff.json", "utf8"));
 describe("Creative Lab exchange without visual grammar", () => {
+  it("preserves original feedback exactly while rejecting blank or oversized input", () => {
+    const p = example();
+    const original = "  TEST\tcomentario exacto\nsegunda línea\n";
+    p.daniel_feedback[0].verbatim = original;
+    expect(creativeLabHandoffSchema.parse(p).daniel_feedback[0].verbatim).toBe(
+      original,
+    );
+    for (const invalid of ["", "  \n\t", "x".repeat(12001)]) {
+      p.daniel_feedback[0].verbatim = invalid;
+      expect(creativeLabHandoffSchema.safeParse(p).success).toBe(false);
+    }
+  });
   it("accepts the documented unbound prototype and separates verbatim feedback from observations", () => {
     const p = creativeLabHandoffSchema.parse(example());
     expect(validateLabHandoff(p, { prototype: p.prototype })).toEqual(p);

@@ -2,6 +2,15 @@ import { z } from "zod";
 import { bindingSchema, checksumSchema } from "./schema";
 
 const text = z.string().trim().min(1).max(12000),
+  // Check meaningful content without normalizing the human's original text.
+  verbatimFeedback = z
+    .string()
+    .min(1)
+    .max(12000)
+    .refine(
+      (value) => value.trim().length > 0,
+      "Feedback must contain non-whitespace content",
+    ),
   name = z.string().trim().min(1).max(200),
   url = z.url().regex(/^https:\/\//);
 /** Private, future-ingestion exchange. Reported lab approval is never publication authority. */
@@ -66,7 +75,7 @@ export const creativeLabHandoffSchema = z
       .array(
         z.strictObject({
           id: name,
-          verbatim: text,
+          verbatim: verbatimFeedback,
           recorded_at: z.iso.datetime(),
           scene_id: name.optional(),
         }),

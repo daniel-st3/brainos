@@ -52,6 +52,8 @@ Every referenced asset, including a mask/intermediate/ancestor input, must be se
 
 All feedback belongs to this exact prototype iteration. Preserve each exchange as a separate immutable snapshot; changing a prototype does not carry approval forward. Duplicate IDs, missing associations, detached observations, stale reviews, active rule candidates and publication flags are rejected. A future importer must supply a trusted prototype receipt; `validateLabHandoff` compares its ID/revision/checksum and, when bound, current editorial/brief/scene references. Caller-reported reviewer names, rights and feedback are evidence to review, not authentication. A real importer must authenticate Daniel, verify private upload receipts, retain snapshots through the existing history mechanism and recheck current editorial/rights rules.
 
+Original `daniel_feedback.verbatim` preserves spaces, tabs and line breaks exactly; validation rejects whitespace-only or oversized input without trimming meaningful feedback. Normalized observations remain separate.
+
 This iteration creates the exchange contract **for future ingestion**, not a new live ingest endpoint, UI, feedback database, scoring system or learning engine. Do not place private exchanges on public routes or log their full payloads. Do not treat artifact URLs as permission to fetch arbitrary resources.
 
 ## Unchanged control plane
