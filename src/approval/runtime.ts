@@ -1,4 +1,4 @@
-import { tasks, wait } from "@trigger.dev/sdk";
+import { idempotencyKeys, tasks, wait } from "@trigger.dev/sdk";
 import type { Rpc } from "../ingestion/store";
 import { findReview } from "./service";
 export function approvalRuntimeReady() {
@@ -25,7 +25,10 @@ export async function wakeApproval(rpc: Rpc, id: string) {
       "publication-approval",
       { candidateId: id },
       {
-        idempotencyKey: `approval:${id}:${r.data.decision ? "decided" : "start"}`,
+        idempotencyKey: await idempotencyKeys.create(
+          `approval:${id}:${r.data.decision ? "decided" : "start"}`,
+          { scope: "global" },
+        ),
         idempotencyKeyTTL: "30d",
       },
     );
