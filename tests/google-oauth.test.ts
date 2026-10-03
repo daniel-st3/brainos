@@ -135,3 +135,27 @@ it("notification consent adds send-only Gmail permission and binds intent inside
     ).notifications,
   ).toBe(false);
 });
+
+vi.mock("@/server/auth", () => ({ editor: async () => "editor-id" }));
+it("preview consent starts on the canonical callback host before setting the PKCE cookie", async () => {
+  const { GET } =
+    await import("../src/app/api/integrations/google/start/route");
+  const redirect = await GET(
+    new Request(
+      "https://preview.example/api/integrations/google/start?notifications=true",
+    ),
+  );
+  expect(redirect.headers.get("location")).toBe(
+    "https://newsroom.example/api/integrations/google/start?notifications=true",
+  );
+  expect(redirect.headers.get("set-cookie")).toBeNull();
+  const start = await GET(
+    new Request(
+      "https://newsroom.example/api/integrations/google/start?notifications=true",
+    ),
+  );
+  expect(new URL(start.headers.get("location")!).hostname).toBe(
+    "accounts.google.com",
+  );
+  expect(start.headers.get("set-cookie")).toContain("HttpOnly");
+});
