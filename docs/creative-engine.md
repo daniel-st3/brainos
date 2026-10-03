@@ -4,6 +4,8 @@
 
 The existing BrainOS product theme is an internal interface. It is not the DVNI brand system. No final public palette, accent, typeface, logo or carousel template is selected here.
 
+The subsequent composable-metadata audit is documented in [creative-lab.md](creative-lab.md). Optional scene layers/operations and intermediate derivations preserve existing version-1 package hashes when absent. The separate C#2 exchange captures prototype-specific feedback for future ingestion, without activating learned rules or granting publication authority. [creative-tooling.md](creative-tooling.md) documents current tooling licenses and Canva boundaries.
+
 ## Flow and persistence
 
 Story → human-approved angle and exact approved script revision → supplied creative brief → reviewed asset candidates → optional manual ChatGPT/Canva handoff → approved creative specification → registered renderer → human output review → existing platform package/final approval/outbox.

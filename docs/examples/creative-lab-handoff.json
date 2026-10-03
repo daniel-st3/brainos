@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "format": "creative_lab_handoff",
+  "grammar_status": "PENDING_C2_CREATIVE_VALIDATION",
+  "prototype": {
+    "id": "TEST-only-prototype",
+    "revision": 1,
+    "specification_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "visual_thesis": "TEST fixture only, no public aesthetic decision",
+  "source_assets": [],
+  "scenes": [
+    {
+      "id": "TEST-scene-1",
+      "composition_notes": "Caller supplies composition notes",
+      "source_asset_ids": []
+    }
+  ],
+  "tools_used": [
+    {
+      "name": "TEST manual tool",
+      "notes": "No tool was executed for this example"
+    }
+  ],
+  "final_artifact": {
+    "design_url": "https://example.invalid/TEST-only-prototype",
+    "sha256": null
+  },
+  "daniel_feedback": [
+    {
+      "id": "TEST-feedback-1",
+      "verbatim": "TEST placeholder, not actual Daniel feedback",
+      "recorded_at": "2026-10-03T15:00:00Z",
+      "scene_id": "TEST-scene-1"
+    }
+  ],
+  "observations": [
+    {
+      "id": "TEST-observation-1",
+      "statement": "TEST normalized observation",
+      "disposition": "neutral",
+      "source_feedback_ids": ["TEST-feedback-1"],
+      "scene_id": "TEST-scene-1",
+      "normalized_by": "TEST fixture author",
+      "normalized_at": "2026-10-03T15:00:00Z"
+    }
+  ],
+  "review": {
+    "decision_scope": "prototype_visual_only",
+    "state": "changes_requested",
+    "prototype_revision": 1,
+    "specification_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "reported_reviewer": "TEST fixture reviewer, not Daniel",
+    "reviewed_at": "2026-10-03T15:00:00Z",
+    "source_feedback_ids": ["TEST-feedback-1"]
+  },
+  "rule_candidates": [
+    {
+      "id": "TEST-candidate-1",
+      "statement": "TEST potential learning, not a design rule",
+      "observation_ids": ["TEST-observation-1"],
+      "scope_notes": "Synthetic example only",
+      "status": "unvalidated"
+    }
+  ],
+  "unresolved_questions": ["C#2 must provide actual prototype evidence"],
+  "publishable": false,
+  "publication_authorized": false
+}

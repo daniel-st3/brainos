@@ -31,6 +31,7 @@ import {
   type CreativeRenderer,
 } from "../src/creative/renderers";
 import { readFileSync } from "node:fs";
+import { compositingSchema } from "../src/creative/composition";
 
 let db: PGlite,
   rpc: Rpc,
@@ -255,6 +256,264 @@ describe("neutral creative contracts", () => {
     );
   });
 });
+describe("composable creative metadata", () => {
+  it("preserves existing package hashes when optional compositing is absent", () => {
+    const p = fixture();
+    expect(hash(creativePackageSchema.parse(p))).toBe(hash(p));
+    expect(p.carousel!.scenes[0]).not.toHaveProperty("compositing");
+  });
+  it("supports independent layers, foreground/background type and intentional crop without a layout preset", () => {
+    const p = fixture(),
+      s = p.carousel!.scenes[0],
+      front = uid(),
+      back = uid();
+    s.typography = [
+      { role: "test-display", direction: "TEST caller supplied" },
+    ];
+    s.compositing = compositingSchema.parse({
+      schema_version: 1,
+      layers: [
+        {
+          id: front,
+          intent: "TEST foreground type",
+          z_index: 9,
+          asset_ids: [],
+          copy_key: "headline",
+          typography_role: "test-display",
+          frame: { x: -0.2, y: 0, width: 1.4, height: 0.8 },
+          transformations: [],
+        },
+        {
+          id: back,
+          intent: "TEST background",
+          z_index: -4,
+          asset_ids: [],
+          transformations: [],
+        },
+      ],
+      relationships: [
+        { from_layer_id: front, to_layer_id: back, intent: "TEST overlaps" },
+      ],
+      operations: [],
+    });
+    p.carousel!.scenes.push({
+      ...structuredClone(s),
+      id: uid(),
+      composition: "TEST radically different geometry",
+      compositing: {
+        schema_version: 1,
+        layers: [],
+        relationships: [],
+        operations: [],
+      },
+    });
+    expect(
+      creativePackageSchema.parse(p).carousel!.scenes[0].compositing!.layers[0]
+        .z_index,
+    ).toBe(9);
+    expect(creativeTokens(p.visual!)).toEqual({});
+    s.compositing!.layers[0].copy_key = "missing";
+    expect(creativePackageSchema.safeParse(p).success).toBe(false);
+  });
+  function derivedFixture() {
+    const p = fixture(),
+      requirement = uid(),
+      original = uid(),
+      output = uid(),
+      op = uid();
+    p.requirements.push({
+      id: requirement,
+      description: "TEST input and intermediate mask",
+      required: true,
+      scene_ids: [],
+      usage: "TEST",
+      rights_requirements: [],
+      fallback_strategy: "Wait",
+    });
+    const candidate = (id: string, sha256: string) => ({
+      id,
+      requirement_id: requirement,
+      provider: "manual_upload" as const,
+      canonical_source_url: null,
+      creator: "TEST",
+      usage_basis: "TEST unreviewed",
+      license: null,
+      attribution: "TEST",
+      retrieved_at: now,
+      mime: "image/png",
+      width: 2,
+      height: 2,
+      duration: null,
+      sha256,
+      relevance: "TEST",
+      selected: false,
+      human_review: "pending" as const,
+      rights_status: "unknown" as const,
+      publishable: false as const,
+      authoritative_asset_id: null,
+      media_id: null,
+      file_reference: null,
+      extensions: {},
+    });
+    p.assets.push(
+      candidate(original, hash("original TEST")),
+      candidate(output, hash("mask TEST")),
+    );
+    const s = p.carousel!.scenes[0];
+    s.asset_ids = [original, output];
+    s.compositing = compositingSchema.parse({
+      schema_version: 1,
+      layers: [
+        {
+          id: uid(),
+          intent: "TEST masked source",
+          z_index: 2,
+          asset_ids: [original],
+          mask: { asset_id: output, mode: "alpha" },
+          transformations: [
+            {
+              asset_id: original,
+              operation: "test.custom.crop",
+              parameters: {},
+              focal_point: { x: 0.8, y: 0.2 },
+              crop: { x: 0.1, y: 0, width: 0.9, height: 1 },
+            },
+          ],
+        },
+      ],
+      relationships: [],
+      operations: [
+        {
+          id: op,
+          operation: "test.custom.operation",
+          version: "1",
+          intent: "TEST only",
+          input_asset_ids: [original],
+          output_asset_ids: [output],
+          depends_on: [],
+          parameters: {},
+          sources: p.brief.sources,
+        },
+      ],
+    });
+    p.assets[1].derivation = {
+      schema_version: 1,
+      operation_id: op,
+      tool: { name: "TEST", version: "1" },
+      brief_id: p.brief.id,
+      brief_revision: p.brief.revision,
+      content_id: p.binding.content_id,
+      content_version: p.binding.content_version,
+      draft_id: p.binding.draft_id,
+      draft_revision: p.binding.draft_revision,
+      inputs: [{ asset_id: original, sha256: p.assets[0].sha256! }],
+    };
+    return p;
+  }
+  it("retains intermediate lineage and never clears source or generated rights", () => {
+    const p = creativePackageSchema.parse(derivedFixture());
+    expect(p.assets[1].derivation!.tool.name).toBe("TEST");
+    const record: CreativeRecord = {
+      status: "approved",
+      package: p,
+      approval: { actor, at: now, fingerprint: hash(p) },
+    };
+    expect(creativeRenderIssues(record, state, stories).join()).toContain(
+      "Referenced creative input",
+    );
+    p.assets.forEach((a) => {
+      a.selected = true;
+      a.human_review = "accepted";
+    });
+    record.approval!.fingerprint = hash(p);
+    expect(creativeRenderIssues(record, state, stories).join()).toContain(
+      "rights clearance",
+    );
+    expect(
+      p.assets.every((a) => !a.publishable && a.rights_status === "unknown"),
+    ).toBe(true);
+    delete p.assets[1].derivation;
+    record.approval!.fingerprint = hash(p);
+    expect(creativeRenderIssues(record, state, stories).join()).toContain(
+      "derivation provenance",
+    );
+  });
+  it("rejects stale source checksums, revisions, unknown references, cycles and out-of-range crops", () => {
+    for (const corrupt of [
+      (p: CreativePackage) => {
+        p.assets[0].sha256 = hash("changed TEST");
+      },
+      (p: CreativePackage) => {
+        p.assets[1].derivation!.brief_revision++;
+      },
+      (p: CreativePackage) => {
+        p.assets[1].derivation!.draft_revision++;
+      },
+      (p: CreativePackage) => {
+        p.carousel!.scenes[0].compositing!.layers[0].mask!.asset_id = uid();
+      },
+      (p: CreativePackage) => {
+        const op = p.carousel!.scenes[0].compositing!.operations[0];
+        op.depends_on = [op.id];
+      },
+      (p: CreativePackage) => {
+        p.carousel!.scenes[0].compositing!.relationships.push({
+          from_layer_id: uid(),
+          to_layer_id: uid(),
+          intent: "TEST",
+        });
+      },
+      (p: CreativePackage) => {
+        p.carousel!.scenes[0].compositing!.layers[0].transformations[0].crop!.width = 1;
+      },
+      (p: CreativePackage) => {
+        const op = p.carousel!.scenes[0].compositing!.operations[0];
+        op.input_asset_ids = [p.assets[1].id];
+        p.assets[1].derivation!.inputs = [
+          { asset_id: p.assets[1].id, sha256: p.assets[1].sha256! },
+        ];
+      },
+    ]) {
+      const p = derivedFixture();
+      corrupt(p);
+      expect(creativePackageSchema.safeParse(p).success).toBe(false);
+    }
+  });
+  it("validates operation evidence and invalidates exact approval after a layer edit", () => {
+    const p = creativePackageSchema.parse(derivedFixture());
+    p.carousel!.scenes[0].compositing!.operations[0].sources = [
+      { source_id: uid() },
+    ];
+    expect(() => currentCreative(p, state, stories)).toThrow("retained");
+    const q = fixture(),
+      s = q.carousel!.scenes[0];
+    s.compositing = {
+      schema_version: 1,
+      layers: [
+        {
+          id: uid(),
+          intent: "TEST",
+          z_index: 0,
+          asset_ids: [],
+          transformations: [],
+        },
+      ],
+      relationships: [],
+      operations: [],
+    };
+    const record: CreativeRecord = {
+      status: "approved",
+      package: q,
+      approval: { actor, at: now, fingerprint: hash(q) },
+    };
+    expect(creativeRenderIssues(record, state, stories)).toEqual([]);
+    s.compositing.layers[0].z_index++;
+    expect(creativeRenderIssues(record, state, stories)).toContain(
+      "Exact creative specification approval required",
+    );
+  });
+});
+
 describe("persisted creative workflows", () => {
   it("stale imported provenance or bytes block rendering even after authoritative rights clearance", () => {
     const p = fixture(),

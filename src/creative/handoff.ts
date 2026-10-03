@@ -40,6 +40,7 @@ export function canvaHandoff(
         usage_basis: a.usage_basis,
         rights_status: a.rights_status,
         human_review: a.human_review,
+        ...(a.derivation ? { derivation: a.derivation } : {}),
         publishable: false,
       })),
     sources: stories
@@ -48,6 +49,9 @@ export function canvaHandoff(
         [
           p.brief.sources,
           ...p.carousel!.scenes.map((s) => s.sources),
+          ...p.carousel!.scenes.flatMap(
+            (s) => s.compositing?.operations.map((o) => o.sources) ?? [],
+          ),
           ...p.captions.map((c) => c.sources),
         ]
           .flat()

@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  compositingSchema,
+  assetDerivationSchema,
+  sourceReferenceSchema,
+} from "./composition";
+export { sourceReferenceSchema } from "./composition";
 
 const id = z.uuid(),
   text = z.string().trim().min(1).max(12000);
@@ -13,11 +19,6 @@ export const bindingSchema = z.strictObject({
   angle_id: id,
   draft_id: id,
   draft_revision: revision,
-});
-export const sourceReferenceSchema = z.strictObject({
-  source_id: id,
-  evidence_id: id.optional(),
-  note: text.optional(),
 });
 const typographySchema = z
   .array(
@@ -93,6 +94,7 @@ export const carouselSceneSchema = z
     copy: z.record(z.string().max(80), z.string().max(12000)),
     hierarchy: z.array(z.string().max(80)).max(30),
     composition: text,
+    compositing: compositingSchema.optional(),
     asset_ids: z.array(id).max(30),
     typography: typographySchema,
     palette: paletteSchema.optional(),
@@ -188,6 +190,7 @@ export const assetCandidateSchema = z.strictObject({
   requirement_id: id,
   provider: z.enum(assetProviders),
   provider_name: z.string().max(200).optional(),
+  derivation: assetDerivationSchema.optional(),
   canonical_source_url: url.nullable(),
   creator: z.string().max(500).nullable(),
   usage_basis: z.string().max(5000),
@@ -296,6 +299,84 @@ export const creativePackageSchema = z
     for (const s of p.carousel?.scenes ?? [])
       if (s.asset_ids.some((id) => !p.assets.some((a) => a.id === id)))
         fail("Scene asset missing");
+    const assets = new Map(p.assets.map((a) => [a.id, a]));
+    const operations = (p.carousel?.scenes ?? []).flatMap(
+      (s) => s.compositing?.operations ?? [],
+    );
+    if (new Set(operations.map((o) => o.id)).size !== operations.length)
+      fail("Operation IDs must be unique across scenes");
+    const outputs = operations.flatMap((o) => o.output_asset_ids);
+    if (new Set(outputs).size !== outputs.length)
+      fail("Each intermediate asset must have one producer operation");
+    for (const s of p.carousel?.scenes ?? []) {
+      for (const l of s.compositing?.layers ?? []) {
+        const refs = [
+          ...l.asset_ids,
+          ...l.transformations.map((t) => t.asset_id),
+          ...(l.mask ? [l.mask.asset_id] : []),
+        ];
+        if (refs.some((id) => !s.asset_ids.includes(id)))
+          fail("Layer assets must be declared in the scene");
+        if (l.copy_key && !Object.hasOwn(s.copy, l.copy_key))
+          fail("Layer copy key missing");
+        if (
+          l.typography_role &&
+          !s.typography.some((t) => t.role === l.typography_role)
+        )
+          fail("Layer typography role missing");
+      }
+      for (const o of s.compositing?.operations ?? [])
+        if (
+          [...o.input_asset_ids, ...o.output_asset_ids].some(
+            (id) => !s.asset_ids.includes(id),
+          )
+        )
+          fail("Operation assets must be declared in the scene");
+    }
+    const visiting = new Set<string>(),
+      visited = new Set<string>();
+    const visitAsset = (id: string): void => {
+      if (visiting.has(id)) {
+        fail("Derived asset dependency cycle");
+        return;
+      }
+      if (visited.has(id)) return;
+      const a = assets.get(id);
+      if (!a) {
+        fail("Derived asset input missing");
+        return;
+      }
+      visiting.add(id);
+      if (a.derivation) {
+        const d = a.derivation,
+          op = operations.find((o) => o.id === d.operation_id);
+        if (
+          d.brief_id !== p.brief.id ||
+          d.brief_revision !== p.brief.revision ||
+          d.content_id !== p.binding.content_id ||
+          d.content_version !== p.binding.content_version ||
+          d.draft_id !== p.binding.draft_id ||
+          d.draft_revision !== p.binding.draft_revision
+        )
+          fail("Derived asset revision binding is stale");
+        if (
+          !op ||
+          !op.output_asset_ids.includes(a.id) ||
+          new Set(d.inputs.map((i) => i.asset_id)).size !== d.inputs.length ||
+          op.input_asset_ids.length !== d.inputs.length ||
+          d.inputs.some((i) => !op.input_asset_ids.includes(i.asset_id))
+        )
+          fail("Derived asset operation provenance mismatch");
+        for (const i of d.inputs) {
+          if (assets.get(i.asset_id)?.sha256 !== i.sha256)
+            fail("Derived asset input checksum is stale");
+          visitAsset(i.asset_id);
+        }
+      }
+      visiting.delete(id);
+      visited.add(id);
+    };
+    p.assets.forEach((a) => visitAsset(a.id));
     for (const m of p.motion?.scenes ?? [])
       if (!scenes.has(m.scene_id))
         fail("Motion must reference the same carousel scenes");

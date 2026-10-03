@@ -1,0 +1,118 @@
+{
+  "checked_at": "2026-10-03",
+  "method": "GitHub connector GET default-branch commits?per_page=1 and releases?per_page=1; official repository files/documentation. Activity is a signal, not a support guarantee.",
+  "repositories": [
+    {
+      "repo": "danielgatis/rembg",
+      "sha": "202e42649a8492a7c49f808de36608a7d1cbbfe3",
+      "date": "2026-09-20T17:13:21Z",
+      "message": "Update u2net_cloth_seg.py (#853)",
+      "url": "https://github.com/danielgatis/rembg/commit/202e42649a8492a7c49f808de36608a7d1cbbfe3",
+      "latest_returned_release": {
+        "tag": "v2.0.85",
+        "published_at": "2026-09-20T17:16:22Z",
+        "prerelease": false,
+        "url": "https://github.com/danielgatis/rembg/releases/tag/v2.0.85"
+      }
+    },
+    {
+      "repo": "facebookresearch/sam2",
+      "sha": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
+      "date": "2024-12-16T00:47:17Z",
+      "message": "remove `.pin_memory()` in `obj_pos` of `SAM2Base` to resolve and error in MPS (#495)",
+      "url": "https://github.com/facebookresearch/sam2/commit/2b90b9f5ceec907a1c18123530e92e794ad901a4",
+      "latest_returned_release": null
+    },
+    {
+      "repo": "lovell/sharp",
+      "sha": "6992852d1aeacc3eeb37a5bf4394498f0931f958",
+      "date": "2026-10-02T16:08:41Z",
+      "message": "Prevent possible corruption when retaining ICC profile",
+      "url": "https://github.com/lovell/sharp/commit/6992852d1aeacc3eeb37a5bf4394498f0931f958",
+      "latest_returned_release": {
+        "tag": "v0.35.5",
+        "published_at": "2026-09-27T13:44:22Z",
+        "prerelease": false,
+        "url": "https://github.com/lovell/sharp/releases/tag/v0.35.5"
+      }
+    },
+    {
+      "repo": "opentypejs/opentype.js",
+      "sha": "5d65b6dcfab5115f90d375f8ba6b7942fdaa0138",
+      "date": "2026-05-19T19:55:13Z",
+      "message": "Merge pull request #830 from mtsubs/master",
+      "url": "https://github.com/opentypejs/opentype.js/commit/5d65b6dcfab5115f90d375f8ba6b7942fdaa0138",
+      "latest_returned_release": {
+        "tag": "2.0.0",
+        "published_at": "2026-05-06T16:44:23Z",
+        "prerelease": false,
+        "url": "https://github.com/opentypejs/opentype.js/releases/tag/2.0.0"
+      }
+    },
+    {
+      "repo": "foliojs/fontkit",
+      "sha": "93551c1047452b1a8f9a3fd330517d8420398af4",
+      "date": "2026-10-02T21:33:59Z",
+      "message": "Fix glyph code point cache after composite decomposition (#387)",
+      "url": "https://github.com/foliojs/fontkit/commit/93551c1047452b1a8f9a3fd330517d8420398af4",
+      "latest_returned_release": {
+        "tag": "v2.0.0",
+        "published_at": "2022-06-18T23:04:45Z",
+        "prerelease": false,
+        "url": "https://github.com/foliojs/fontkit/releases/tag/v2.0.0"
+      }
+    },
+    {
+      "repo": "observablehq/plot",
+      "sha": "535723d5e433727720d9b673c31622821bb03210",
+      "date": "2026-09-01T17:19:34Z",
+      "message": "remove link rel=canonical",
+      "url": "https://github.com/observablehq/plot/commit/535723d5e433727720d9b673c31622821bb03210",
+      "latest_returned_release": {
+        "tag": "v0.6.17",
+        "published_at": "2025-02-14T16:05:17Z",
+        "prerelease": false,
+        "url": "https://github.com/observablehq/plot/releases/tag/v0.6.17"
+      }
+    },
+    {
+      "repo": "motion-canvas/motion-canvas",
+      "sha": "7b91435c301d530351dcf5ebb91dd139c002e405",
+      "date": "2026-07-02T20:01:32Z",
+      "message": "refactor(docs): update domain (#1231)",
+      "url": "https://github.com/motion-canvas/motion-canvas/commit/7b91435c301d530351dcf5ebb91dd139c002e405",
+      "latest_returned_release": {
+        "tag": "v3.18.0-alpha.0",
+        "published_at": "2025-02-16T09:12:40Z",
+        "prerelease": true,
+        "url": "https://github.com/motion-canvas/motion-canvas/releases/tag/v3.18.0-alpha.0"
+      }
+    },
+    {
+      "repo": "microsoft/playwright",
+      "sha": "7ad3fba1aad9471c7e46d67a11b0e710a5d77ea8",
+      "date": "2026-10-03T06:57:47Z",
+      "message": "fix(mcp): pass credentials from --proxy-server as proxy username/password (#43071)",
+      "url": "https://github.com/microsoft/playwright/commit/7ad3fba1aad9471c7e46d67a11b0e710a5d77ea8",
+      "latest_returned_release": {
+        "tag": "v1.63.0",
+        "published_at": "2026-09-04T22:40:31Z",
+        "prerelease": false,
+        "url": "https://github.com/microsoft/playwright/releases/tag/v1.63.0"
+      }
+    },
+    {
+      "repo": "lokesh/color-thief",
+      "sha": "a19bce8570322ca619df1f3cae6e0d6efd446639",
+      "date": "2026-08-03T00:16:04Z",
+      "message": "Guard against referenced-but-unpublished files in the tarball (#286)",
+      "url": "https://github.com/lokesh/color-thief/commit/a19bce8570322ca619df1f3cae6e0d6efd446639",
+      "latest_returned_release": {
+        "tag": "v3.5.0",
+        "published_at": "2026-08-02T23:30:53Z",
+        "prerelease": false,
+        "url": "https://github.com/lokesh/color-thief/releases/tag/v3.5.0"
+      }
+    }
+  ]
+}

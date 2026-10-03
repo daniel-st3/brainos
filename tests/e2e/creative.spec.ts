@@ -120,6 +120,21 @@ test("private creative commands persist revision-bound scaffolding without gener
           copy: { headline: "TEST ONLY" },
           hierarchy: ["headline"],
           composition: "Fixture, not a final style",
+          compositing: {
+            schema_version: 1,
+            layers: [
+              {
+                id: crypto.randomUUID(),
+                intent: "TEST composition only",
+                z_index: 3,
+                asset_ids: [],
+                copy_key: "headline",
+                transformations: [],
+              },
+            ],
+            relationships: [],
+            operations: [],
+          },
           asset_ids: [],
           typography: [],
           sources: [],
@@ -152,7 +167,27 @@ test("private creative commands persist revision-bound scaffolding without gener
   const data = await exported.json();
   expect(data.brief.exact_copy).toEqual(specification.brief.exact_copy);
   expect(data.publishable).toBe(false);
+  expect(data.scenes[0].compositing).toEqual(
+    specification.carousel.scenes[0].compositing,
+  );
+  await command({
+    action: "creative_approve",
+    id: creative.id,
+    confirmed: true,
+  });
+  specification.brief.revision++;
+  specification.carousel.scenes[0].compositing.layers[0].z_index++;
+  await command({
+    action: "creative_save",
+    id: creative.id,
+    package: specification,
+  });
   const final = await (await request.get("/api/control")).json();
+  const revised = final.state.entities.find(
+    (e: { id: string }) => e.id === creative.id,
+  );
+  expect(revised.data.status).toBe("draft");
+  expect(revised.data.approval).toBeNull();
   const job = final.state.jobs.find((j: { id: string }) => j.id === a.id);
   expect(job.status).toBe("blocked");
   expect(job.error).toContain("NOT_CONFIGURED");

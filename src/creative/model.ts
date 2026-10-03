@@ -50,6 +50,9 @@ export function currentCreative(
     p.brief.sources,
     ...p.captions.map((c) => c.sources),
     ...(p.carousel?.scenes.map((s) => s.sources) ?? []),
+    ...(p.carousel?.scenes.flatMap(
+      (s) => s.compositing?.operations.map((o) => o.sources) ?? [],
+    ) ?? []),
   ].flat();
   if (
     sources.some(
@@ -126,6 +129,24 @@ export function creativeRenderIssues(
     if (!p.assets.some((a) => a.requirement_id === r.id && a.selected))
       issues.push(`Required asset unresolved: ${r.id}`);
   const story = stories.find((s) => s.id === p.binding.story_id)!;
+  const referenced = new Set([
+    ...(p.carousel?.scenes.flatMap((s) => s.asset_ids) ?? []),
+    ...p.assets
+      .filter((a) => a.selected)
+      .flatMap((a) => a.derivation?.inputs.map((i) => i.asset_id) ?? []),
+  ]);
+  for (const id of referenced)
+    if (!p.assets.some((a) => a.id === id && a.selected))
+      issues.push(
+        `Referenced creative input must be selected and rights reviewed: ${id}`,
+      );
+  for (const s of p.carousel?.scenes ?? [])
+    for (const op of s.compositing?.operations ?? [])
+      for (const id of op.output_asset_ids)
+        if (p.assets.some((a) => a.id === id && a.selected && !a.derivation))
+          issues.push(
+            `Intermediate creative asset requires derivation provenance: ${id}`,
+          );
   for (const a of p.assets.filter((a) => a.selected)) {
     const authority = story.assets.find(
       (asset) => asset.id === a.authoritative_asset_id,
