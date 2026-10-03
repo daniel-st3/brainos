@@ -47,13 +47,13 @@ export function AccountActivation({ initial }: { initial: State }) {
   }
   if (!state)
     return (
-      <main id="main-content" className="page">
+      <main id="main-content" className="page account-activation">
         <h1>Account Activation</h1>
         <p role="status">{message || "Cargando…"}</p>
       </main>
     );
   return (
-    <main id="main-content" className="page">
+    <main id="main-content" className="page account-activation">
       <header className="page-header">
         <h1>Account Activation</h1>
         <p>

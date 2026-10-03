@@ -52,6 +52,26 @@ test("public consent intake works and does not reveal private records", async ({
   await expect(page.getByRole("status")).toContainText("retirado");
 });
 
+test("connected-account identifiers and capability blockers fit activation at 390px", async ({
+  page,
+}) => {
+  await page.goto("/activation");
+  await page
+    .locator(".account-activation .panel")
+    .first()
+    .evaluate((panel) => {
+      const status = document.createElement("p");
+      status.textContent =
+        "BEEHIIV_POSTS_PLAN_ACCESS_REQUIRED · pub_00000000-0000-4000-8000-000000000001";
+      panel.append(status);
+    });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+  ).toBe(false);
+});
+
 test("activation, safe demo, PNG share and install manifest have safe boundaries", async ({
   page,
   request,

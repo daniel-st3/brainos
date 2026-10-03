@@ -2176,3 +2176,8 @@ td:first-child {
 .public-site button {
   min-height: 44px;
 }
+
+/* Provider IDs and actionable blocker codes must fit mobile activation panels. */
+.account-activation {
+  overflow-wrap: anywhere;
+}
