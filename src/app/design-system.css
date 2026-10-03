@@ -903,6 +903,7 @@ tbody tr:hover {
   padding: var(--space-6) 0;
 }
 .brief-card.brief-lead {
+  position: relative;
   grid-column: 1/-1;
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
@@ -910,12 +911,23 @@ tbody tr:hover {
   padding-block: var(--space-7);
   border-top: 2px solid var(--ink);
 }
+.brief-lead > [aria-hidden="true"] {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  width: 1px;
+}
 .brief-lead > .brief-card-top {
   grid-column: 1/-1;
+  grid-row: 1;
 }
 .brief-lead > h2,
-.brief-lead > p {
+.brief-lead > p,
+.brief-lead > .inline-meta {
   grid-column: 1;
+}
+.brief-lead > h2 {
+  grid-row: 2;
 }
 .brief-lead > dl {
   grid-column: 2;

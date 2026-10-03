@@ -16,6 +16,17 @@ test("live brief: evidence, fail-closed workflow, pilot actions and a manual mis
   await expect(
     page.getByText("POTENTIAL ANGLE · SYSTEM SUGGESTION"),
   ).toBeVisible();
+  // The invisible pilot marker must not place the live headline below its dossier.
+  await page.evaluate(() => document.fonts.ready);
+  const lead = page.locator(".brief-lead");
+  const headline = await lead.locator("h2").boundingBox();
+  const evidence = await lead.locator("dl").boundingBox();
+  const marker = await lead.locator('[aria-hidden="true"]').boundingBox();
+  expect(headline).not.toBeNull();
+  expect(evidence).not.toBeNull();
+  expect(marker).not.toBeNull();
+  expect(headline!.y).toBeLessThan(evidence!.y + 60);
+  expect(marker!.y).toBeLessThanOrEqual(headline!.y);
   await page.getByRole("button", { name: "Save / prioritize" }).click();
   await expect(
     page.getByRole("button", { name: "Unsave", exact: true }),
