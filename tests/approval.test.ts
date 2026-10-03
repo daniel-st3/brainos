@@ -8,6 +8,7 @@ import {
   decideCandidate,
   resumeCandidate,
   findReview,
+  recoverApprovedCandidates,
 } from "../src/approval/service";
 import { readControl } from "../src/control/service";
 import { processOutbox } from "../src/providers/outbox";
@@ -251,4 +252,39 @@ it("content revision changes invalidate a candidate even when copy is identical"
       "SIMULATION reviewer",
     ),
   ).rejects.toThrow("STALE");
+});
+
+it("wait has no worker deadline and hosted recovery closes an interrupted approval/enqueue gap", async () => {
+  const f = await fixture();
+  expect(f.review.data.expires_at).toBeNull();
+  expect(f.review.data.wait_token_id).toBeNull();
+  await decideCandidate(
+    rpc,
+    f.review.id,
+    { checksum: f.review.data.checksum, decision: "approve" },
+    "SIMULATION reviewer",
+  );
+  // Simulate the HTTP process ending immediately after durable approval.
+  expect((await findReview(rpc, f.review.id)).data.outbox_id).toBeNull();
+  await recoverApprovedCandidates(rpc, true);
+  const id = (await findReview(rpc, f.review.id)).data.outbox_id;
+  expect(id).toBeTruthy();
+  await recoverApprovedCandidates(rpc, true);
+  expect((await findReview(rpc, f.review.id)).data.outbox_id).toBe(id);
+  const rows = (await rpc("read_provider_outbox", { p_demo: true })) as {
+    id: string;
+    status: string;
+  }[];
+  expect(rows.find((r) => r.id === id)?.status).toBe("queued");
+  expect(
+    (await readControl(rpc, true)).entities.some(
+      (e) => e.kind === "publication" && e.parent_id === f.contentId,
+    ),
+  ).toBe(false);
+  await processOutbox(rpc, true);
+  expect(
+    (await readControl(rpc, true)).entities.find(
+      (e) => e.kind === "publication" && e.parent_id === f.contentId,
+    )?.data.simulated,
+  ).toBe(true);
 });

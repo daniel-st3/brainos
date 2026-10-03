@@ -22,6 +22,8 @@ import {
   openSecret,
   sealSecret,
   googleDriveScope,
+  gmailSendScope,
+  validateConsentDetails,
 } from "../src/integrations/google-oauth";
 let db: PGlite, rpc: Rpc;
 beforeAll(async () => {
@@ -108,4 +110,28 @@ describe("Google runtime OAuth", () => {
     );
     expect(rights.rows[0].allowed).toBe(false);
   });
+});
+
+it("notification consent adds send-only Gmail permission and binds intent inside encrypted state", () => {
+  const { cookie, url } = createConsent("editor-id", 1000, true);
+  const params = new URL(url).searchParams;
+  expect(params.get("scope")?.split(" ")).toEqual([
+    googleDriveScope,
+    gmailSendScope,
+  ]);
+  expect(params.get("scope")).not.toMatch(/gmail\.(readonly|modify|compose)/);
+  expect(params.get("include_granted_scopes")).toBe("true");
+  expect(
+    validateConsentDetails(cookie, params.get("state")!, "editor-id", 2000)
+      .notifications,
+  ).toBe(true);
+  const drive = createConsent("editor-id", 1000);
+  expect(
+    validateConsentDetails(
+      drive.cookie,
+      new URL(drive.url).searchParams.get("state")!,
+      "editor-id",
+      2000,
+    ).notifications,
+  ).toBe(false);
 });

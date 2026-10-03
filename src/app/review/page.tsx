@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notificationStatus } from "@/approval/notifications";
 import { readControl } from "@/control/service";
 import { applicationRpc } from "@/ingestion/store";
 import { dataMode } from "@/server/mode";
@@ -16,6 +17,7 @@ export default async function Review() {
     dataMode() === "demo",
   );
   const candidates = state.entities.filter(isReview);
+  const email = await notificationStatus(await applicationRpc());
   return (
     <>
       <PageHeader
@@ -23,6 +25,18 @@ export default async function Review() {
         title="The final editorial call."
         description="Evidence, copy, angle and rights. One package. One exact revision."
       />
+      <p role="status">
+        {email === "GMAIL_AUTHORIZED" ? (
+          "Review email authorized. Delivery status is retained with each notification."
+        ) : (
+          <>
+            Review email needs Google send consent.{" "}
+            <a href="/api/integrations/google/start?notifications=true">
+              Enable review email
+            </a>
+          </>
+        )}
+      </p>
       <section aria-label="Publication decisions">
         {candidates.map((e) => (
           <p key={e.id}>

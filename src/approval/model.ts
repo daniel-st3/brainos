@@ -50,7 +50,7 @@ export interface Candidate {
     | "EXPIRED"
     | "QUEUED";
   created_at: string;
-  expires_at: string;
+  expires_at: string | null;
   decision: null | {
     decision: DecisionInput["decision"];
     actor: string;

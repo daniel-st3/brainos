@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { editor } from "@/server/auth";
 import { createConsent, oauthCookie } from "@/integrations/google-oauth";
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const actor = await editor();
-    const consent = createConsent(actor);
+    const consent = createConsent(
+      actor,
+      Date.now(),
+      new URL(request.url).searchParams.get("notifications") === "true",
+    );
     const response = NextResponse.redirect(consent.url);
     response.cookies.set(oauthCookie, consent.cookie, {
       httpOnly: true,

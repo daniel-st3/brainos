@@ -1,3 +1,4 @@
+/** Optional experimental Trigger wake path; never imported by production approval routes. */
 import { idempotencyKeys, tasks, wait } from "@trigger.dev/sdk";
 import type { Rpc } from "../ingestion/store";
 import { findReview } from "./service";

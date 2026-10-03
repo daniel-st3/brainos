@@ -1,3 +1,4 @@
+/** Optional experimental Trigger adapter. Production approval uses Supabase + hosted cron. */
 import { task, schedules, wait } from "@trigger.dev/sdk";
 import { applicationRpc } from "../ingestion/store";
 import { readControl } from "../control/service";
@@ -44,7 +45,10 @@ export const publicationApproval = task({
     const rpc = await applicationRpc();
     let row = await findReview(rpc, candidateId);
     if (!row.data.decision && row.data.state === "AWAITING_DANIEL") {
-      if (Date.parse(row.data.expires_at) <= Date.now()) {
+      if (
+        row.data.expires_at &&
+        Date.parse(row.data.expires_at) <= Date.now()
+      ) {
         await expireCandidate(rpc, row.id);
         return { state: "EXPIRED" };
       }
@@ -55,7 +59,9 @@ export const publicationApproval = task({
           row.id,
           (
             await wait.createToken({
-              timeout: new Date(row.data.expires_at),
+              timeout: row.data.expires_at
+                ? new Date(row.data.expires_at)
+                : "30d",
               idempotencyKey: `review:${row.id}`,
               idempotencyKeyTTL: "30d",
             })
@@ -67,8 +73,11 @@ export const publicationApproval = task({
         await wait.completeToken(token, { candidate_id: row.id });
       const result = await wait.forToken(token);
       if (!result.ok) {
-        await expireCandidate(rpc, row.id);
-        return { state: "EXPIRED" };
+        if (row.data.expires_at) {
+          await expireCandidate(rpc, row.id);
+          return { state: "EXPIRED" };
+        }
+        return { state: "AWAITING_DANIEL" };
       }
     }
     row = await findReview(rpc, candidateId);

@@ -9,8 +9,7 @@ import {
   findReview,
   resumeCandidate,
 } from "@/approval/service";
-import { approvalRuntimeReady, wakeApproval } from "@/approval/runtime";
-import { processOutbox } from "@/providers/outbox";
+import { notificationStatus } from "@/approval/notifications";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ id: string }> };
 export async function GET(_request: Request, context: Context) {
@@ -34,11 +33,13 @@ export async function GET(_request: Request, context: Context) {
         state: row.data.state,
         decision: row.data.decision,
         expires_at: row.data.expires_at,
-        expired: Date.parse(row.data.expires_at) <= Date.now(),
+        expired:
+          !!row.data.expires_at &&
+          Date.parse(row.data.expires_at) <= Date.now(),
         outbox_id: row.data.outbox_id,
         current,
-        cloud: approvalRuntimeReady(),
-        notification: "IN_APP_ONLY",
+        cloud: process.env.CONTENT_OS_MODE === "supabase",
+        notification: await notificationStatus(rpc),
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
@@ -63,32 +64,16 @@ export async function POST(request: Request, context: Context) {
       id = (await context.params).id;
     const text = await request.text();
     if (text.length > 10000) throw Error("REQUEST_TOO_LARGE");
-    const raw = JSON.parse(text),
-      before = await findReview(rpc, id);
-    if (
-      raw.decision === "approve" &&
-      !before.is_demo &&
-      !approvalRuntimeReady()
-    )
-      throw Error("TRIGGER_RUNTIME_NOT_CONFIGURED");
-    const row = await decideCandidate(rpc, id, raw, actor);
-    // Safe hosted UI/receipt test without a Trigger account; never a live-send fallback.
-    if (
-      row.is_demo &&
-      !approvalRuntimeReady() &&
+    const row = await decideCandidate(rpc, id, JSON.parse(text), actor);
+    // A durable outbox row is the success boundary. Cron owns all dispatch.
+    const result =
       row.data.decision?.decision === "approve"
-    ) {
-      await resumeCandidate(rpc, id);
-      await processOutbox(rpc, true);
-      return NextResponse.json({
-        saved: true,
-        simulated: true,
-        cloud_wait_verified: false,
-      });
-    }
+        ? await resumeCandidate(rpc, id)
+        : { state: row.data.state, outbox_id: null };
     return NextResponse.json({
       saved: true,
-      wake: await wakeApproval(rpc, id),
+      simulated: row.is_demo,
+      ...result,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "";
@@ -98,7 +83,6 @@ export async function POST(request: Request, context: Context) {
       "DECISION_ALREADY_RECORDED",
       "REVIEW_CLOSED",
       "SCHEDULE_PASSED_CREATE_NEW_CANDIDATE",
-      "TRIGGER_RUNTIME_NOT_CONFIGURED",
     ];
     return NextResponse.json(
       {

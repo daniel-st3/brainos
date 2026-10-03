@@ -77,7 +77,7 @@ export async function driveToken(savedConnection?: SavedDriveConnection) {
   const clientId = process.env.GOOGLE_CLIENT_ID,
     clientSecret = process.env.GOOGLE_CLIENT_SECRET,
     configuredRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-  let refreshToken = configuredRefreshToken;
+  let refreshToken = savedConnection ? undefined : configuredRefreshToken;
   if (!refreshToken && process.env.CONTENT_OS_MODE === "supabase") {
     const { applicationRpc } = await import("../ingestion/store");
     const { openSecret } = await import("./google-oauth");

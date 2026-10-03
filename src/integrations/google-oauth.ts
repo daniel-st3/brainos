@@ -6,6 +6,7 @@ import {
   createHash,
   timingSafeEqual,
 } from "node:crypto";
+export const gmailSendScope = "https://www.googleapis.com/auth/gmail.send";
 export const googleDriveScope = "https://www.googleapis.com/auth/drive";
 export const oauthCookie = "brainos_google_oauth";
 const purpose = "brainos-google-oauth-v1";
@@ -81,12 +82,22 @@ export function oauthConfiguration() {
     redirectUri: `${origin}/api/integrations/google/callback`,
   };
 }
-export function createConsent(actor: string, now = Date.now()) {
+export function createConsent(
+  actor: string,
+  now = Date.now(),
+  notifications = false,
+) {
   const config = oauthConfiguration();
   const state = randomBytes(32).toString("base64url"),
     verifier = randomBytes(32).toString("base64url");
   const cookie = sealSecret(
-    JSON.stringify({ actor, state, verifier, expires: now + 600000 }),
+    JSON.stringify({
+      actor,
+      state,
+      verifier,
+      notifications,
+      expires: now + 600000,
+    }),
     "state",
   );
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -94,7 +105,10 @@ export function createConsent(actor: string, now = Date.now()) {
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
     response_type: "code",
-    scope: googleDriveScope,
+    scope: notifications
+      ? `${googleDriveScope} ${gmailSendScope}`
+      : googleDriveScope,
+    include_granted_scopes: "true",
     access_type: "offline",
     prompt: "consent select_account",
     login_hint: personalDriveConfiguration().email,
@@ -104,7 +118,7 @@ export function createConsent(actor: string, now = Date.now()) {
   }).toString();
   return { cookie, url: url.toString() };
 }
-export function validateConsent(
+export function validateConsentDetails(
   cookie: string,
   state: string,
   actor: string,
@@ -115,6 +129,7 @@ export function validateConsent(
     state: string;
     verifier: string;
     expires: number;
+    notifications?: boolean;
   };
   const expected = Buffer.from(decoded.state),
     actual = Buffer.from(state);
@@ -126,5 +141,17 @@ export function validateConsent(
     !timingSafeEqual(actual, expected)
   )
     throw new Error("OAuth request expired or does not match this editor.");
-  return decoded.verifier;
+  return {
+    verifier: decoded.verifier,
+    notifications: decoded.notifications === true,
+  };
+}
+
+export function validateConsent(
+  cookie: string,
+  state: string,
+  actor: string,
+  now = Date.now(),
+) {
+  return validateConsentDetails(cookie, state, actor, now).verifier;
 }

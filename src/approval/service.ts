@@ -209,7 +209,7 @@ export async function createCandidate(
       frozen,
       state: "AWAITING_DANIEL",
       created_at: now,
-      expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+      expires_at: null, // Durable wait; freshness/revision checks remain authoritative.
       decision: null,
       wait_token_id: null,
       outbox_id: null,
@@ -303,7 +303,10 @@ export async function decideCandidate(
       return row;
     throw Error("DECISION_ALREADY_RECORDED");
   }
-  if (d.state !== "AWAITING_DANIEL" || Date.parse(d.expires_at) <= Date.now())
+  if (
+    d.state !== "AWAITING_DANIEL" ||
+    (!!d.expires_at && Date.parse(d.expires_at) <= Date.now())
+  )
     throw Error("REVIEW_CLOSED");
   const s = await controlSnapshot(rpc, row.is_demo);
   const current = s.state.entities.find((e) => e.id === row.id)!;
@@ -443,4 +446,29 @@ export async function expireCandidate(rpc: Rpc, id: string) {
     [{ ...r, version: r.version + 1, data: { ...r.data, state: "EXPIRED" } }],
     "cloud-approval-expired",
   );
+}
+
+/** Recover a request that persisted approval but stopped before linking its outbox.
+ * Same exact-revision checks and idempotency key as the HTTP path; no dispatch here.
+ */
+export async function recoverApprovedCandidates(rpc: Rpc, demo: boolean) {
+  const state = await readControl(rpc, demo);
+  const results: { id: string; status: string; outbox_id?: string | null }[] =
+    [];
+  for (const row of state.entities
+    .filter((e) => isReview(e) && e.data.state === "APPROVED")
+    .slice(0, 10)) {
+    try {
+      const result = await resumeCandidate(rpc, row.id);
+      results.push({
+        id: row.id,
+        status: result.state,
+        outbox_id: result.outbox_id,
+      });
+    } catch {
+      // Sanitized, inspectable result. A stale candidate cannot acquire publication authority.
+      results.push({ id: row.id, status: "REVALIDATION_OR_ENQUEUE_FAILED" });
+    }
+  }
+  return results;
 }

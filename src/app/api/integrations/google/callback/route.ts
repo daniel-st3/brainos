@@ -7,10 +7,11 @@ import { editor } from "@/server/auth";
 import { applicationRpc } from "@/ingestion/store";
 import {
   googleDriveScope,
+  gmailSendScope,
   oauthConfiguration,
   oauthCookie,
   sealSecret,
-  validateConsent,
+  validateConsentDetails,
 } from "@/integrations/google-oauth";
 export async function GET(request: NextRequest) {
   let response: NextResponse;
@@ -22,7 +23,11 @@ export async function GET(request: NextRequest) {
       cookie = request.cookies.get(oauthCookie)?.value;
     if (!state || !code || !cookie || request.nextUrl.searchParams.has("error"))
       throw new Error("Google consent was denied, expired or incomplete.");
-    const verifier = validateConsent(cookie, state, actor);
+    const { verifier, notifications } = validateConsentDetails(
+      cookie,
+      state,
+      actor,
+    );
     const result = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       body: new URLSearchParams({
@@ -50,6 +55,10 @@ export async function GET(request: NextRequest) {
       !token.scope?.split(" ").includes(googleDriveScope)
     )
       throw new Error("Offline Drive consent was not granted.");
+    if (notifications && !token.scope.split(" ").includes(gmailSendScope))
+      throw new Error(
+        "Gmail send consent was not granted. Existing Drive connection was preserved.",
+      );
     const verified = await verifyPersonalDrive(token.access_token, true);
     await (
       await applicationRpc()
@@ -65,7 +74,12 @@ export async function GET(request: NextRequest) {
       childrenList: 200,
     });
     response = NextResponse.redirect(
-      new URL("/production/studio?google=connected", config.origin),
+      new URL(
+        notifications
+          ? "/review?gmail=connected"
+          : "/production/studio?google=connected",
+        config.origin,
+      ),
     );
   } catch (e) {
     if (e instanceof DriveVerificationError)

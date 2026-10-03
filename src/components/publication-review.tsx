@@ -15,7 +15,7 @@ type View = {
   current: boolean;
   cloud: boolean;
   outbox_id: string | null;
-  expires_at: string;
+  expires_at: string | null;
   expired: boolean;
 };
 export function PublicationReview({ id }: { id: string }) {
@@ -112,14 +112,6 @@ export function PublicationReview({ id }: { id: string }) {
       {!view.current && (
         <p role="alert">
           This candidate is stale. Prepare a new revision before approving.
-        </p>
-      )}
-      {!view.cloud && (
-        <p role="status">
-          Cloud task connection pending.{" "}
-          {view.demo
-            ? "This review tests the simulator only."
-            : "Approval to publish is disabled until Trigger.dev is connected."}
         </p>
       )}
       <section aria-label="Final media" className="publication-media">
@@ -219,8 +211,7 @@ export function PublicationReview({ id }: { id: string }) {
                   busy ||
                   !view.current ||
                   mediaError ||
-                  loadedMedia.length < frozen.media.length ||
-                  (!view.demo && !view.cloud)
+                  loadedMedia.length < frozen.media.length
                 }
                 onClick={() => decide("approve")}
               >

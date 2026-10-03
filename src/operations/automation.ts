@@ -107,7 +107,25 @@ export async function executeAutomation(
     for (const kind of ["graphic", "distribution", "analytics"] as const)
       results.push(await processJobs(rpc, kind, false));
     const { processOutbox } = await import("../providers/outbox");
-    results.push(await processOutbox(rpc, false));
+    const { recoverApprovedCandidates } = await import("../approval/service");
+    const { deliverReviewNotifications } =
+      await import("../approval/notifications");
+    for (const demo of [false, true]) {
+      results.push({
+        approvalRecovery: await recoverApprovedCandidates(rpc, demo),
+        demo,
+      });
+      results.push({ outbox: await processOutbox(rpc, demo), demo });
+      // Notification transport errors cannot prevent publication recovery/receipts.
+      try {
+        results.push({
+          notifications: await deliverReviewNotifications(rpc, demo),
+          demo,
+        });
+      } catch {
+        results.push({ notifications: "DELIVERY_CHECK_FAILED", demo });
+      }
+    }
     const { providerHealth } = await import("../providers/health");
     results.push(await providerHealth(rpc));
     const { syncSubscribers } = await import("../providers/subscribers");

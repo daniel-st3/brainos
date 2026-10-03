@@ -1,68 +1,39 @@
-# Cloud publication approval spine
+# Cloud approval: Supabase + Vercel + existing hosted outbox
 
-This is an execution boundary for **already prepared and cleared final packages**, not a creative engine or an autonomous editorial author. No creative grammar was added. Existing upstream research/angle/script/production/package approvals remain authoritative. The system cannot honestly promise one human decision for the entire discovery-to-original-video path today.
+Trigger.dev is **not required** for production approval. Its isolated task adapter remains experimental/optional; production routes do not import or wake it. No Trigger credentials or deployment are needed.
 
-## Existing infrastructure reused
+## Production flow
 
-- Supabase private control entities and append-only control events, epoch compare-and-swap; existing editor auth + same-origin POST checks.
-- Existing immutable provider outbox, leased dispatcher, final revision/rights/freshness checks, adapter selection, receipts and 24/72/168-hour analytics jobs.
-- Private `brainos-production` storage; checked provider delivery URLs minted only at dispatch. Review URLs are authenticated and expire after five minutes, are not persisted in candidates, and are never public page content.
-- Existing Trigger.dev SDK **4.6.4** and task directory. Existing discovery/operations scheduling is unchanged.
-- In-app notification records and the review queue. No external notification service was configured as of 2026-10-03.
+Prepared, approved platform package → `POST /api/approvals` → immutable `cloud_approval_v1` review + notification → `AWAITING_DANIEL` in hosted Supabase → authenticated phone decision → exact revision validation → durable decision → `resumeCandidate()` → existing immutable provider outbox → existing Supabase cron / Vercel automation → due-time and approval revalidation → provider receipt + analytics jobs.
 
-## Smallest added flow
+New candidates have `expires_at: null`: waiting consumes no worker/process and has no deadline. Previously created candidates retain their original immutable expiry. Waiting indefinitely is not unlimited permission: approval and dispatch still check exact content/draft/package/media revisions, rights, claims freshness and target identity. A requested schedule that passed before approval requires a new candidate.
 
-`prepare-publication-review` (trusted cloud task, package ID + optional exact schedule)
-→ validate existing approvals/account/media
-→ immutable `review` control record (`cloud_approval_v1`) + deduplicated notification
-→ `publication-approval`
-→ `wait.createToken` / `wait.forToken` (30-day deadline; yields compute)
-→ authenticated `/review/<candidate ID>`
-→ atomic database decision + exact content final approval
-→ complete wait token / idempotent resume task
-→ optionally `wait.until` requested schedule
-→ revalidate candidate
-→ existing outbox + adapter + publication receipt + analytics.
+The HTTP success boundary is `saved: true` with `outbox_id` for an approval. There is **no synchronous social dispatch**. Reject and request-changes retain the decision and cannot enqueue. If the request ends after persisting approval, the existing automation recovers approved candidates with the same idempotency key before processing the outbox. Stale candidates fail revalidation. Repeated decisions/resumes cannot create another publication.
 
-The token payload is **never approval authority**. The task reloads the server-recorded decision; a forged/completed token cannot publish. Wait token secrets/public callback URLs are never sent to the review client. API decision retries are safe; another decision cannot overwrite the first.
+Existing `brainos-operations` runs at minute 17 each hour. Discovery also invokes hosted operations. No second scheduler or production content cadence is introduced. A scheduled item is eligible at `due_at` and is dispatched on the next successful hosted tick, **not necessarily at the exact requested minute**. Database claims enforce `due_at <= now()`; the immutable candidate schedule is also checked before dispatch.
 
-Frozen data includes full caption/thread/title, destination account/adapter, story/draft/package/creative bindings, original media identity/checksum/order and requested timestamp. A database trigger forbids rewriting this snapshot and recorded decision. Dispatch checks the candidate again in addition to existing outbox invariants. Refreshes of provider credentials do not change destination identity.
+Automation processes live and isolated simulator outboxes separately. Demo candidates require demo accounts and the simulator adapter; they cannot fall through to a live social provider. `staging: true` on candidate creation selects the demo namespace and still requires authenticated editor access and the same guards.
 
-- `APPROVE`: exact final approval, then resume. An expired schedule needs a fresh candidate.
-- `REQUEST_CHANGES`: terminal for this candidate; immutable feedback and a link/notification to the existing story draft workspace. New revision → new candidate → fresh approval.
-- `REJECT`: terminal, audited, no enqueue.
-- Expired/stale candidates cannot be approved. No automatic approval on timeout.
+## Gmail review notification
 
-One candidate has one destination/platform package. Multi-platform publication uses separately reviewable exact platform candidates; there is no implicit cross-platform authorization.
+The existing Google web client and callback support an explicit optional send-consent action:
+`/api/integrations/google/start?notifications=true` (also linked from `/review`).
 
-## Mobile review
+Daniel signs in with the configured personal Google account. Existing Drive scope is preserved; the only new Gmail permission is `https://www.googleapis.com/auth/gmail.send`. No inbox read, modify, compose, ChatGPT connector, new account, or paid vendor is used. Google requires Gmail API enabled in the existing Cloud project and consent for the send scope. No new redirect URI/client is needed.
 
-`/review` is the queue; `/review/<id>` shows complete ordered media, playable video, exact caption/thread, destination, timing, sources and checksums. Existing single-editor authentication applies. All mutations require same-origin requests. Approval remains disabled for live candidates until the cloud runtime is configured. Demo candidates are clearly labeled and can only use the simulator.
+The encrypted OAuth state binds editor, purpose, expiry and PKCE. The callback verifies the expected personal Drive account/root and both required scopes before replacing the encrypted server-side refresh token. Failed/partial consent leaves the previous connection intact. The sender refreshes that exact stored connection and verifies the personal identity; it never uses an unrelated environment refresh token.
 
-## Unattended dependency audit
+The message contains only the fixed subject “DVNI post ready for review”, story title and configured HTTPS origin + authenticated review URL. Recipient is the existing verified personal Google account, not a request parameter. No approval token, checksum, media or server credential is included. Demo mail is labelled SIMULATION.
 
-| Step | Current execution | Limitation |
-|---|---|---|
-| Discovery, retained-source enrichment, operations | Existing hosted scheduler + Supabase/Vercel | Pilot and ranking unchanged |
-| Original editorial preparation | Deterministic existing operations + human approvals | No new unattended creative generator; no invented Daniel take |
-| Existing SVG → PNG/JPEG | Node/Sharp, Supabase storage in hosted mode | Existing rendering only, no new style |
-| Recording, Whisper, FFmpeg renders | Mac worker today | **Cloud rendering/transcription not provisioned**; pre-uploaded final cloud media can proceed |
-| Immutable review/decision | Supabase + Vercel | Works without Mac |
-| Durable task wait/resume | Trigger.dev task implemented | **Project/key/deployment missing from inspected local/Vercel config** |
-| Phone notification | In-app record/queue | **External push/email transport absent**. Opening BrainOS is currently required |
-| Publish/receipts/analytics | Existing hosted outbox/operations | Provider capability limits continue to apply |
+Candidate creation attempts delivery; existing hosted automation retries pending/definitively rejected sends. Concurrent sends use control-record compare-and-swap. `SENT` records the Gmail ID. `BLOCKED` retains a sanitized status (for example Gmail API disabled/consent failure). `SENDING` interrupted after two minutes and ambiguous network/5xx outcomes become `UNKNOWN`, never blindly resent: Gmail has no exactly-once send key. Message-ID is stable but is not claimed as a deduplication guarantee. Provider acceptance is not proof of phone notification settings or inbox delivery.
 
-Optional local workers are not imported by the new runtime. Tasks reject local persistence and require `CONTENT_OS_MODE=supabase`.
+Without consent, status is `GMAIL_CONSENT_REQUIRED`; review/approval/outbox still work. Google external apps in Testing can have short-lived refresh authorization; unattended long-term operation requires the existing OAuth app's appropriate publishing status. Do not claim lifetime authorization from a successful consent.
 
-## Runtime activation (no credentials invented)
+## Mac dependency
 
-Use an existing Trigger project, with its **staging** environment. Securely configure `TRIGGER_PROJECT_REF` and `TRIGGER_SECRET_KEY` in the preview control plane. Trigger worker needs the existing Supabase URL/server secret, BrainOS integration encryption key, provider configuration/origin and appropriate publishing emergency-stop setting; never expose server credentials to clients. Deploy tasks using the matching Trigger CLI and verify SDK compatibility/current CLI help. Do not point staging at production runtime keys.
+For a **prepared final package**, the critical path uses hosted Supabase data/private media, authenticated Vercel routes, existing Supabase cron and hosted provider/simulator adapters. No local worker, terminal, browser automation or Codex process is required to wait or dispatch. Local tools used for deploying/observing tests are not runtime dependencies. Phone/browser activity is needed only to submit the human decision.
 
-No production cadence is attached. `staging-approval-schedule` accepts only a demo package in Trigger's staging environment, with schedule `externalId` set to that demo package UUID. It creates a simulator-only candidate and pauses. Attach a temporary schedule, observe the run, then remove it. No real provider call is allowed by the demo candidate guard.
-
-`approval-recovery` is a reusable unattached scheduled task that redelivers pending wake events for already-persisted candidates/decisions. Configure an operational recovery schedule when activating Trigger; this is not a new content-production cadence. Failed runs can also be replayed safely. Already queued outbox rows are reconciled by existing hosted operations.
-
-**Notification blocker:** smallest option is an already-owned transactional email or push transport sending only “DVNI post ready for review” + authenticated link. No media, secrets or approval tokens in messages. None was found; no new account, email send or paid notification vendor was introduced. Mobile web push would additionally require device permission/subscription and server VAPID keys; that is not secretly enabled here.
+Recording, local transcription and video rendering remain outside this proof and may still depend on the Mac. No creative grammar or creative automation changed.
 
 ## Provider findings (official docs checked 2026-10-03)
 
@@ -76,6 +47,6 @@ YouTube's private-only audit limit and beehiiv's Posts plan limit remain blocker
 
 ## Verification boundary
 
-Unit/integration tests exercise the real database/control/outbox with simulated provider, immutability, stale approval, retries, schedule, changes/rejection and analytics receipts. Trigger task tests inject the SDK wait boundary and prove database-authoritative resume; these are **not evidence of a deployed Trigger checkpoint**. Browser tests cover authenticated-route behavior in the demo fixture runtime, media and 390px decisions. A deployed Supabase/Vercel simulator test can verify hosted storage/review/receipts without claiming it proves Trigger cloud execution.
+Tests must distinguish local contracts from hosted proof. Hosted proof creates candidates through deployed Vercel, checks persisted waiting/queued records, invokes the existing Supabase-hosted dispatch function (no local outbox executor), closes the setup/browser process, and then reads receipts from Supabase. Before-due and after-due snapshots must retain the same immutable schedule. Never label a simulator receipt a real social publication.
 
-Official Trigger references: [wait tokens](https://trigger.dev/docs/wait-for-token), [schedules](https://trigger.dev/docs/tasks/scheduled). Real cloud pause/resume proof remains required after project credentials are installed. No real content production cadence or live publication is activated by this pass.
+Official references: [Gmail send](https://developers.google.com/workspace/gmail/api/guides/sending), [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes), [incremental Google authorization](https://developers.google.com/identity/protocols/oauth2/web-server#incrementalAuth).

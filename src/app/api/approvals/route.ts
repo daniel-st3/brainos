@@ -5,9 +5,13 @@ import { sameOrigin } from "@/server/request";
 import { applicationRpc } from "@/ingestion/store";
 import { readControl } from "@/control/service";
 import { createCandidate, isReview } from "@/approval/service";
-import { approvalRuntimeReady, wakeApproval } from "@/approval/runtime";
+import {
+  deliverReviewNotifications,
+  notificationStatus,
+} from "@/approval/notifications";
 import { dataMode } from "@/server/mode";
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 export async function GET() {
   try {
     await editor();
@@ -17,16 +21,14 @@ export async function GET() {
     );
     return NextResponse.json(
       {
-        reviews: state.entities
-          .filter(isReview)
-          .map((e) => ({
-            id: e.id,
-            state: e.data.state,
-            frozen: e.data.frozen,
-            checksum: e.data.checksum,
-          })),
-        cloud: approvalRuntimeReady(),
-        notification: "IN_APP_ONLY",
+        reviews: state.entities.filter(isReview).map((e) => ({
+          id: e.id,
+          state: e.data.state,
+          frozen: e.data.frozen,
+          checksum: e.data.checksum,
+        })),
+        cloud: process.env.CONTENT_OS_MODE === "supabase",
+        notification: await notificationStatus(await applicationRpc()),
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
@@ -42,10 +44,11 @@ export async function POST(request: Request) {
     );
   try {
     await editor();
-    const { packageId, scheduledAt } = z
+    const { packageId, scheduledAt, staging } = z
       .object({
         packageId: z.string().uuid(),
         scheduledAt: z.iso.datetime().nullable().default(null),
+        staging: z.boolean().default(false),
       })
       .strict()
       .parse(await request.json());
@@ -54,12 +57,13 @@ export async function POST(request: Request) {
       rpc,
       packageId,
       scheduledAt,
-      dataMode() === "demo",
+      dataMode() === "demo" || staging,
     );
-    return NextResponse.json({
-      id: row.id,
-      wake: await wakeApproval(rpc, row.id),
-    });
+    // Failure to notify must never lose the persisted review. Cron retries delivery.
+    await deliverReviewNotifications(rpc, row.is_demo, fetch, row.id).catch(
+      () => {},
+    );
+    return NextResponse.json({ id: row.id, state: row.data.state });
   } catch (e) {
     const error = e instanceof Error ? e.message : "Unable to prepare review";
     return NextResponse.json(
