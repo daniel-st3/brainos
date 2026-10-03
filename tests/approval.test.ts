@@ -237,3 +237,18 @@ it("anonymous roles cannot mutate approval records or call its database guard", 
     await db.exec("reset role");
   }
 });
+it("content revision changes invalidate a candidate even when copy is identical", async () => {
+  const f = await fixture();
+  expect(f.review.data.frozen.content_version).toBeGreaterThan(0);
+  await db.query("update control_entities set version=version+1 where id=$1", [
+    f.contentId,
+  ]);
+  await expect(
+    decideCandidate(
+      rpc,
+      f.review.id,
+      { checksum: f.review.data.checksum, decision: "approve" },
+      "SIMULATION reviewer",
+    ),
+  ).rejects.toThrow("STALE");
+});

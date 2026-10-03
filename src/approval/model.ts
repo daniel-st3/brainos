@@ -23,6 +23,7 @@ export interface Candidate {
     package_id: string;
     package_version: number;
     content_id: string;
+    content_version: number;
     story_id: string;
     draft_id: string;
     draft_revision: number;

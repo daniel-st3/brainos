@@ -177,8 +177,8 @@ export function PublicationReview({ id }: { id: string }) {
           </p>
         ))}
         <p>
-          Package revision {frozen.package_version} · Draft revision{" "}
-          {frozen.draft_revision}
+          Content revision {frozen.content_version} · Package revision{" "}
+          {frozen.package_version} · Draft revision {frozen.draft_revision}
         </p>
         <code>{view.checksum}</code>
         <p>Candidate: {id}</p>

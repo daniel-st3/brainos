@@ -121,6 +121,7 @@ function freeze(
     package_id: p.id,
     package_version: p.version,
     content_id: c.id,
+    content_version: c.version,
     story_id: story.id,
     draft_id: p.data.draft_id,
     draft_revision: p.data.draft_revision,
@@ -252,19 +253,37 @@ export async function createCandidate(
   return review;
 }
 export function assertCurrent(s: Snapshot, row: Review) {
+  const content = s.state.entities.find(
+    (e) => e.id === row.data.frozen.content_id,
+  );
+  const approved = row.data.decision?.decision === "approve";
+  const receipt = s.state.entities.some(
+    (e) =>
+      e.kind === "publication" &&
+      e.data.package_id === row.data.frozen.package_id &&
+      e.data.package_version === row.data.frozen.package_version,
+  );
+  // The atomic decision and existing receipt each increment the control record once.
+  // Any other content revision requires a new candidate, even if copy was later reverted.
+  const expected =
+    row.data.frozen.content_version +
+    (approved ? 1 : 0) +
+    (approved && receipt ? 1 : 0);
+  if (!content || content.version !== expected) throw Error("STALE_CANDIDATE");
+  const current = freeze(
+    s,
+    row.data.frozen.package_id,
+    row.data.frozen.due_at,
+    row.is_demo,
+  );
+  current.content_version = row.data.frozen.content_version;
   if (
     payloadChecksum(row.data.frozen) !== row.data.checksum ||
-    payloadChecksum(
-      freeze(
-        s,
-        row.data.frozen.package_id,
-        row.data.frozen.due_at,
-        row.is_demo,
-      ),
-    ) !== row.data.checksum
+    payloadChecksum(current) !== row.data.checksum
   )
     throw Error("STALE_CANDIDATE");
 }
+
 export async function decideCandidate(
   rpc: Rpc,
   id: string,
