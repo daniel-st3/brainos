@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EditorialMotion } from "@/components/design/motion";
 import { newsroom } from "@/server/data";
 import { dataMode } from "@/server/mode";
 import { selectBrief } from "@/ingestion/brief";
@@ -15,7 +16,19 @@ import { PageHeader, LevelChip, Empty } from "@/components/ui";
 async function DemoBrief() {
   const stories = (await newsroom()).filter((s) => s.priority && !s.archived);
   return (
-    <>
+    <div className="morning-edition">
+      <EditorialMotion scope=".morning-edition" />
+      <div className="brief-edition">
+        <span>THE MORNING EDITION</span>
+        <span>
+          {new Intl.DateTimeFormat("es-CO", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            timeZone: "America/Bogota",
+          }).format(new Date())}
+        </span>
+      </div>
       <PageHeader
         eyebrow="DAILY EDITION / MORNING BRIEF"
         title="What deserves your attention?"
@@ -28,7 +41,11 @@ async function DemoBrief() {
       </div>
       <div className="brief-grid">
         {stories.map((s, i) => (
-          <article className="brief-card" key={s.id}>
+          <article
+            className={`brief-card ${i === 0 ? "brief-lead" : ""}`}
+            data-reveal
+            key={s.id}
+          >
             <div className="brief-card-top">
               <span className="big-number">0{i + 1}</span>
               <span className="small-cap">{s.pillar} · DEMO</span>
@@ -67,7 +84,7 @@ async function DemoBrief() {
           Prioritize a story from the inbox to add it to your brief.
         </Empty>
       )}
-    </>
+    </div>
   );
 }
 
@@ -83,7 +100,19 @@ export default async function Brief() {
     .at(-1);
   const failed = state.registry.filter((s) => s.active && s.last_error);
   return (
-    <>
+    <div className="morning-edition">
+      <EditorialMotion scope=".morning-edition" />
+      <div className="brief-edition">
+        <span>THE MORNING EDITION</span>
+        <span>
+          {new Intl.DateTimeFormat("es-CO", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            timeZone: "America/Bogota",
+          }).format(new Date())}
+        </span>
+      </div>
       <PageHeader
         eyebrow="DAILY EDITION / LIVE RESEARCH"
         title="What deserves your attention?"
@@ -119,7 +148,11 @@ export default async function Brief() {
           const records = state.records.filter((r) => r.story_id === s.id);
           const score = s.discovery?.scoring;
           return (
-            <article className="brief-card" key={s.id}>
+            <article
+              className={`brief-card ${i === 0 ? "brief-lead" : ""}`}
+              data-reveal
+              key={s.id}
+            >
               <Observation
                 storyId={s.id}
                 kind="surfaced"
@@ -239,6 +272,6 @@ export default async function Brief() {
       <div style={{ marginTop: 24 }}>
         <MissedStoryForm />
       </div>
-    </>
+    </div>
   );
 }

@@ -12,8 +12,14 @@ export default async function Page() {
   );
   return (
     <>
-      <span className="eyebrow">YOUR DECISIONS / HUMAN CONTROL</span>
-      <ActionQueue items={actions(state, stories, production)} />
+      <div className="actions-intro">
+        <span className="eyebrow">YOUR DECISIONS / HUMAN CONTROL</span>
+        <p>
+          Angles, scripts, recordings and final approvals. The next move is
+          yours.
+        </p>
+      </div>
+      <ActionQueue heading="h1" items={actions(state, stories, production)} />
     </>
   );
 }

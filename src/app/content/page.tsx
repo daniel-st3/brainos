@@ -6,7 +6,7 @@ export default async function Content() {
     (r) => r.kind === "content",
   );
   return (
-    <main id="main-content" className="public-site">
+    <section className="public-site">
       <h1>Contenido publicado</h1>
       {rows.length ? (
         rows.map((r) => (
@@ -24,6 +24,6 @@ export default async function Content() {
         <p>No hay publicaciones aprobadas para este sitio todavía.</p>
       )}
       <Link href="/about">Volver</Link>
-    </main>
+    </section>
   );
 }

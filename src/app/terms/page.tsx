@@ -1,6 +1,6 @@
 export default function Terms() {
   return (
-    <main id="main-content" className="public-site">
+    <section className="public-site">
       <h1>Condiciones — borrador para revisión</h1>
       <p>
         Este sitio es un candidato de lanzamiento. El contenido y las
@@ -14,6 +14,6 @@ export default function Terms() {
         aplicaciones.
       </p>
       <a href="/privacy">Privacidad</a>
-    </main>
+    </section>
   );
 }

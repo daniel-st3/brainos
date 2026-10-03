@@ -16,15 +16,19 @@ export default async function Publish() {
       <PageHeader
         eyebrow="PUBLISH / 05"
         title="Ready when you are."
-        description="Approved revisions and internal schedules. Nothing leaves this newsroom automatically."
+        description="Approved revisions and internal schedules. Each real delivery requires a current final approval and explicit authorization."
       />
       <div className="notice">
         <Unplug size={20} />
         <div>
-          <strong>External integrations are not connected.</strong>
+          <strong>
+            Account connection and publication approval are separate.
+          </strong>
           <p>
-            Scheduled times are planning records. To publish, use the platform
-            yourself and record the resulting URL here.
+            This view tracks editorial planning records. Verify live channel
+            capabilities in Account Activation; approve and authorize each
+            provider delivery through the immutable outbox. Native/manual
+            handoff remains available.
           </p>
         </div>
       </div>

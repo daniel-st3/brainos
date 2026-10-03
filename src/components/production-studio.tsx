@@ -1,4 +1,5 @@
 "use client";
+import { humanStatus } from "./design/status";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { DriveConnectionStatus } from "@/integrations/drive-status";
@@ -332,8 +333,29 @@ export function ProductionStudio({
             <h2>{p.data.title}</h2>
             <span className="small-cap">
               r{p.data.packet.revision} · producción v{p.version} ·{" "}
-              {p.data.state}
+              {humanStatus(p.data.state)}
             </span>
+          </div>
+          <div className="studio-steps" aria-label="Production progression">
+            {[
+              "recording_needed",
+              "recording_received",
+              "transcribed",
+              "edit_plan_ready",
+              "assets_ready",
+              "render_ready",
+              "rendered",
+              "review",
+              "approved",
+            ].map((step) => (
+              <span
+                key={step}
+                className={p.data.state === step ? "current" : ""}
+                aria-current={p.data.state === step ? "step" : undefined}
+              >
+                {humanStatus(step)}
+              </span>
+            ))}
           </div>
           <p>
             Ángulo: {story?.angles.find((a) => a.id === p.data.angle_id)?.text}

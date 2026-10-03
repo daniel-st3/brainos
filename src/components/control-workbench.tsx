@@ -1,4 +1,10 @@
 "use client";
+import {
+  humanStatus,
+  capabilityLabel,
+  connectionPresentation,
+} from "./design/status";
+import { StatusChip } from "./design/primitives";
 import { useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -254,6 +260,14 @@ export function Workbench({
     slots: { id: string; title: string; issues: string[]; ready: boolean }[];
   }[];
 }) {
+  const recoveryBlocked = (platform: string) =>
+    platform === "x" &&
+    state.entities.some(
+      (e) =>
+        e.kind === "launch_plan" &&
+        (e.data.account_blockers as Record<string, unknown> | undefined)?.x ===
+          "BLOCKED_ACCOUNT_RECOVERY",
+    );
   const router = useRouter(),
     tab = useSearchParams().get("tab") ?? "content",
     [error, setError] = useState(""),
@@ -1364,14 +1378,43 @@ export function Workbench({
             {accounts.map((a) => (
               <article className="control-card" key={a.platform}>
                 <h3>{a.platform}</h3>
-                <p>{a.status.toUpperCase()}</p>
-                <p>{a.reason}</p>
                 <p>
-                  Verified capabilities: {a.capabilities.join(", ") || "none"}
+                  <StatusChip
+                    tone={
+                      connectionPresentation(
+                        a.status,
+                        recoveryBlocked(a.platform)
+                          ? "BLOCKED_ACCOUNT_RECOVERY"
+                          : null,
+                      ).tone
+                    }
+                  >
+                    {
+                      connectionPresentation(
+                        a.status,
+                        recoveryBlocked(a.platform)
+                          ? "BLOCKED_ACCOUNT_RECOVERY"
+                          : null,
+                      ).label
+                    }
+                  </StatusChip>
+                </p>
+                <p>
+                  {recoveryBlocked(a.platform)
+                    ? "Recover the existing X account before connecting"
+                    : a.reason
+                      ? humanStatus(a.reason)
+                      : "No provider capability blockers"}
+                </p>
+                <p>
+                  Verified capabilities:{" "}
+                  {a.capabilities
+                    .map((c) => capabilityLabel(c, a.platform, a.reason))
+                    .join(", ") || "Not verified"}
                 </p>
                 <Form
                   send={send}
-                  busy={busy}
+                  busy={busy || recoveryBlocked(a.platform)}
                   setError={setError}
                   title="Account created externally"
                   build={(f) => ({

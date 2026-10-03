@@ -142,6 +142,14 @@ export default async function Home() {
           </div>
         </section>
       </div>
+      <div className="command-actions">
+        <ActionQueue
+          items={actions(queue.state, queue.stories, queue.production).slice(
+            0,
+            4,
+          )}
+        />
+      </div>
       <section className="panel flush">
         <div className="section-heading padded">
           <div>

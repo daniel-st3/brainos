@@ -6,7 +6,7 @@ export default async function RecordingDemo() {
     story = stories.find((s) => s.drafts.length)!;
   const draft = story.drafts[0];
   return (
-    <main id="main-content" className="public-site">
+    <section className="public-site">
       <header>
         <span className="eyebrow">DEMO / FICTIONAL FIXTURES</span>
         <h1>BrainOS · demo para grabación</h1>
@@ -91,6 +91,6 @@ export default async function RecordingDemo() {
           post o métrica sintética se presenta como un resultado real.
         </p>
       </section>
-    </main>
+    </section>
   );
 }

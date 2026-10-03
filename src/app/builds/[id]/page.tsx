@@ -12,7 +12,7 @@ export default async function Build({
     );
   if (!r) notFound();
   return (
-    <main id="main-content" className="public-site">
+    <section className="public-site">
       <h1>{r.title}</h1>
       <p>{r.description}</p>
       <p>{r.body}</p>
@@ -21,6 +21,6 @@ export default async function Build({
           Ver proyecto
         </a>
       )}
-    </main>
+    </section>
   );
 }

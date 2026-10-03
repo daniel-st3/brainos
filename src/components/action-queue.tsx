@@ -1,7 +1,9 @@
 import Link from "next/link";
 export function ActionQueue({
   items,
+  heading = "h2",
 }: {
+  heading?: "h1" | "h2";
   items: {
     id: string;
     title: string;
@@ -10,11 +12,12 @@ export function ActionQueue({
     kind: string;
   }[];
 }) {
+  const Heading = heading;
   return (
     <section className="action-queue">
-      <h2>
+      <Heading>
         My Actions <span>{items.length}</span>
-      </h2>
+      </Heading>
       {items.length === 0 ? (
         <p>No pending decisions.</p>
       ) : (

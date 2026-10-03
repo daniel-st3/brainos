@@ -2,6 +2,7 @@ import { applicationRpc } from "@/ingestion/store";
 import { publicRecords } from "@/control/public";
 import { NewsletterSignup } from "@/components/newsletter-signup";
 import Link from "next/link";
+import { EditorialMotion } from "@/components/design/motion";
 export async function generateMetadata() {
   const origin = process.env.CONTENT_OS_ORIGIN;
   const profile = (await publicRecords(await applicationRpc())).find(
@@ -31,23 +32,36 @@ export default async function About() {
   const records = await publicRecords(await applicationRpc()),
     profile = records.find((r) => r.kind === "profile");
   return (
-    <div className="public-site">
+    <div className="public-site public-editorial">
+      <EditorialMotion scope=".public-editorial" />
       <header>
-        <span className="eyebrow">{profile?.title ?? "AI APLICADA"}</span>
+        <span className="eyebrow">DVNI / DANIEL RODRIGUEZ / APPLIED AI</span>
         <h1>{profile?.title ?? "Ideas que se pueden poner a prueba."}</h1>
-        <p>
-          {profile?.description ??
-            "Un espacio para construir, probar y mostrar cómo funciona la inteligencia artificial en la práctica."}
-        </p>
+        <div className="public-intro">
+          <p>
+            {profile?.description ??
+              "Un espacio para construir, probar y mostrar cómo funciona la inteligencia artificial en la práctica."}
+          </p>
+          <div>
+            <span className="small-cap">CONSTRUIR · PROBAR · EXPLICAR</span>
+            <br />
+            <Link className="text-link" href="/contact">
+              Consultoría & charlas ↗
+            </Link>
+          </div>
+        </div>
         {profile?.body && <p className="preserve-lines">{profile.body}</p>}
       </header>
       {["build", "content"].map((kind) => (
-        <section key={kind}>
-          <h2>
-            {kind === "build"
-              ? "Proyectos y pruebas"
-              : "Contenido seleccionado"}
-          </h2>
+        <section key={kind} data-reveal>
+          <div className="public-section-heading">
+            <span>{kind === "build" ? "01 / BUILD" : "02 / READ"}</span>
+            <h2>
+              {kind === "build"
+                ? "Proyectos y pruebas"
+                : "Contenido seleccionado"}
+            </h2>
+          </div>
           {records.filter((r) => r.kind === kind).length === 0 ? (
             <p>
               En preparación. Solo se muestran piezas aprobadas para este sitio.
@@ -70,8 +84,12 @@ export default async function About() {
           )}
         </section>
       ))}
-      <section>
-        <h2>Newsletter</h2>
+      <section id="newsletter" data-reveal>
+        <div className="public-section-heading">
+          <span>03 / LETTER</span>
+          <h2>Newsletter</h2>
+        </div>
+        <span className="small-cap">UNA IDEA QUE VALE LA PENA</span>
         <p>
           Ideas, fuentes y aprendizajes de pruebas reales. Registra tu interés
           para cuando esté lista.
@@ -94,8 +112,10 @@ export default async function About() {
         <Link href="/privacy">Privacidad</Link> ·{" "}
         <Link href="/terms">Condiciones</Link> ·{" "}
         <Link href="/content">Contenido publicado</Link>
-        Privacidad: guardamos el email, consentimiento y origen. No vendemos
-        datos ni enviamos marketing automático. El registro es opcional.
+        <p>
+          Privacidad: guardamos el email, consentimiento y origen. No vendemos
+          datos ni enviamos marketing automático. El registro es opcional.
+        </p>
       </footer>
     </div>
   );

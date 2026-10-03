@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { StatusChip } from "./design/primitives";
+import { humanStatus } from "./design/status";
 import type { operationsCenter } from "@/operations/center";
 type Center = Awaited<ReturnType<typeof operationsCenter>>;
 export function FailureInbox({ center }: { center: Omit<Center, "state"> }) {
@@ -49,23 +51,67 @@ export function FailureInbox({ center }: { center: Omit<Center, "state"> }) {
   return (
     <>
       <h2>Automatización</h2>
-      {Object.entries(center.scheduler).map(([lane, s]) => (
-        <p key={lane}>
-          {lane}: <strong>{s.state}</strong> · esperado {s.expected_at} · último
-          evento {s.last_actual?.window_at ?? "ninguno"}
-        </p>
-      ))}
-      <p>
-        Worker: {center.worker.available ? "disponible" : "BLOCKED_BY_WORKER"}
-      </p>
+      <div className="health-rows">
+        {Object.entries(center.scheduler).map(([lane, s]) => (
+          <div className="health-row" key={lane}>
+            <div>
+              <h3>
+                {lane === "daily" || lane === "discovery"
+                  ? "Daily discovery"
+                  : lane === "hourly" || lane === "operations"
+                    ? "Hourly operations"
+                    : humanStatus(lane)}
+              </h3>
+              <p>
+                Esperado {s.expected_at}
+                <br />
+                Último evento {s.last_actual?.window_at ?? "ninguno"}
+              </p>
+            </div>
+            <StatusChip
+              tone={
+                ["missed", "failed", "stale"].includes(s.state)
+                  ? "warning"
+                  : "positive"
+              }
+            >
+              {humanStatus(s.state)}
+            </StatusChip>
+          </div>
+        ))}
+        <div className="health-row">
+          <div>
+            <h3>Local media worker</h3>
+            <p>Heartbeat · heavy processing stays on your Mac</p>
+          </div>
+          <StatusChip tone={center.worker.available ? "positive" : "warning"}>
+            {center.worker.available ? "Available" : "Worker unavailable"}
+          </StatusChip>
+        </div>
+        <div className="health-row">
+          <div>
+            <h3>Drive & provider connections</h3>
+            <p>
+              Account authentication and publishing capabilities are checked
+              separately.
+            </p>
+          </div>
+          <Link className="text-link" href="/activation">
+            Inspect accounts →
+          </Link>
+        </div>
+      </div>
       <h2>Failure Inbox</h2>
       <p role="status" aria-live="polite">
         {message}
       </p>
+      {!center.failures.length && (
+        <p className="notice">No operations need recovery.</p>
+      )}
       {center.failures.map((f) => (
         <article className="control-card" key={f.subsystem + f.id}>
           <h3>
-            {f.subsystem}: {f.status}
+            {humanStatus(f.subsystem)}: {humanStatus(f.status)}
           </h3>
           <p>{f.error}</p>
           <p>Intentos: {f.attempts}</p>

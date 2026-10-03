@@ -214,9 +214,11 @@ export async function activationState(rpc: Rpc, demo: boolean) {
         free_connector: ["instagram", "tiktok", "x"].includes(p),
         transport: a?.data.delivery_transport ?? "native",
         engineering:
-          ready || ["instagram", "tiktok", "x"].includes(p)
-            ? "READY_FOR_AUTH"
-            : "IMPLEMENTED_UNVERIFIED",
+          a?.data.status === "connected"
+            ? "CONNECTED"
+            : ready || ["instagram", "tiktok", "x"].includes(p)
+              ? "READY_FOR_AUTH"
+              : "IMPLEMENTED_UNVERIFIED",
         app_configured: ready,
         drift: profileDrift(
           profile?.data ?? {},

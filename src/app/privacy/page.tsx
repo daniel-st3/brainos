@@ -1,6 +1,6 @@
 export default function Privacy() {
   return (
-    <main id="main-content" className="public-site">
+    <section className="public-site">
       <h1>Privacidad — borrador para revisión</h1>
       <p>
         BrainOS guarda los datos que introduces, consentimiento y origen para
@@ -22,6 +22,6 @@ export default function Privacy() {
         eliminación.
       </p>
       <a href="/about">Volver</a>
-    </main>
+    </section>
   );
 }

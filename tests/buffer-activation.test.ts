@@ -16,6 +16,7 @@ import {
   type Transport,
 } from "../src/providers/client";
 import { bufferApi } from "../src/providers/buffer-client";
+import { activationState } from "../src/providers/activation";
 import { providerHealth } from "../src/providers/health";
 
 // Real local persistence and auth orchestration, official GraphQL read fixtures.
@@ -95,6 +96,12 @@ it("installs one private key, automatically binds each unique social channel, an
     channels: ["instagram", "tiktok", "x"],
     selection_required: false,
   });
+  const activation = await activationState(rpc, false);
+  expect(
+    activation.providers
+      .filter((p) => p.account?.data.status === "connected")
+      .every((p) => p.engineering === "CONNECTED"),
+  ).toBe(true);
   const connected = await accounts();
   expect(connected).toHaveLength(3);
   for (const account of connected) {

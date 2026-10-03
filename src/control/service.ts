@@ -108,7 +108,10 @@ export function accounts(state: ControlState) {
       handle: e?.data.handle ?? "",
       capabilities: e?.data.capabilities ?? [],
       reason:
-        e?.data.reason ?? "Create the account, then authorize its provider",
+        e?.data.reason ??
+        (e?.data.status === "connected"
+          ? "Verified account connection"
+          : "Create the account, then authorize its provider"),
     };
   });
 }
