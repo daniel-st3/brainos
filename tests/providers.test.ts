@@ -538,6 +538,19 @@ it("OAuth is cookie-bound, one-use, encrypted and account selection fails closed
             ],
           }),
     );
+  const consentUrl = new URL(consent.url);
+  expect(consentUrl.searchParams.get("redirect_uri")).toBe(
+    "https://example.invalid/api/providers/youtube/callback",
+  );
+  expect(consentUrl.searchParams.get("scope")?.split(" ")).toEqual([
+    "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+  ]);
+  expect(consentUrl.searchParams.get("code_challenge_method")).toBe("S256");
+  expect(consentUrl.searchParams.get("code_challenge")).toMatch(
+    /^[A-Za-z0-9_-]{43}$/,
+  );
   await expect(
     finishProviderAuth(
       rpc,

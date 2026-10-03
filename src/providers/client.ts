@@ -187,6 +187,22 @@ export class OfficialClient {
     if (p === "beehiiv") {
       const r = await this.request("/publications");
       rows = list(r.data);
+      for (const publication of rows) {
+        const base = `/publications/${encodeURIComponent(str(publication.id))}`;
+        const checks = await Promise.allSettled([
+          this.request(`${base}?expand=stats`),
+          this.request(`${base}/subscriptions?limit=1`),
+          this.request(`${base}/posts?limit=1`),
+        ]);
+        publication.brainos_stats_read =
+          checks[0].status === "fulfilled" && !!obj(checks[0].value.data).stats;
+        publication.brainos_subscriber_read =
+          checks[1].status === "fulfilled" &&
+          Array.isArray(checks[1].value.data);
+        publication.brainos_posts_read =
+          checks[2].status === "fulfilled" &&
+          Array.isArray(checks[2].value.data);
+      }
     }
     return rows.map((r) => {
       const sn = obj(r.snippet),
@@ -237,14 +253,23 @@ export class OfficialClient {
           capabilities.push("analytics");
       }
       if (p === "beehiiv") {
-        capabilities.push("analytics");
+        if (r.brainos_stats_read === true) capabilities.push("analytics");
+        else blocks.push("BEEHIIV_ANALYTICS_READ_UNAVAILABLE");
+        if (r.brainos_subscriber_read === true)
+          capabilities.push("subscriber_read");
+        else blocks.push("BEEHIIV_SUBSCRIBER_READ_UNAVAILABLE");
+        if (r.brainos_posts_read === true) capabilities.push("posts_read");
+        else blocks.push("BEEHIIV_POSTS_READ_UNAVAILABLE");
         if (process.env.BEEHIIV_POSTS_ACCESS_VERIFIED === "true")
           capabilities.push("publish", "schedule");
         else blocks.push("BEEHIIV_POSTS_PLAN_ACCESS_REQUIRED");
       }
       return {
         id,
-        handle: str(r.username || sn.customUrl || r.name),
+        handle:
+          p === "youtube"
+            ? str(sn.customUrl).replace(/^@/, "")
+            : str(r.username || r.name),
         name: str(r.name || r.display_name || sn.title),
         bio: str(
           r.biography || r.bio_description || r.description || sn.description,

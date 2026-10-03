@@ -224,15 +224,19 @@ export async function activationState(rpc: Rpc, demo: boolean) {
         ),
         capabilities: a?.data.capabilities ?? [],
         blocker:
-          a?.data.delivery_transport === "buffer"
-            ? (a.data.reason ?? "Buffer connected")
-            : p === "x"
-              ? "Paid API access; no spend authorized"
-              : p === "beehiiv"
-                ? "API key and eligible posts API access"
-                : !ready
-                  ? "Developer application/client credentials missing"
-                  : (a?.data.reason ?? "Create account and connect"),
+          p === "x" &&
+          (launch?.data.account_blockers as Record<string, string> | undefined)
+            ?.x === "BLOCKED_ACCOUNT_RECOVERY"
+            ? "BLOCKED_ACCOUNT_RECOVERY"
+            : a?.data.delivery_transport === "buffer"
+              ? (a.data.reason ?? "Buffer connected")
+              : p === "x"
+                ? "Paid API access; no spend authorized"
+                : p === "beehiiv"
+                  ? (a?.data.reason ?? "API key and eligible posts API access")
+                  : !ready
+                    ? "Developer application/client credentials missing"
+                    : (a?.data.reason ?? "Create account and connect"),
       };
     }),
   };

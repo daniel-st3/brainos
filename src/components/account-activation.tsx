@@ -169,17 +169,25 @@ export function AccountActivation({ initial }: { initial: State }) {
           <h2>{p.platform}</h2>
           <p>
             <strong>
-              {String(p.account?.data.status ?? "NOT_CREATED").toUpperCase()}
+              {p.account?.data.creation_state === "created" ? "CREATED · " : ""}
+              {String(
+                p.account?.data.status ??
+                  (p.blocker === "BLOCKED_ACCOUNT_RECOVERY"
+                    ? p.blocker
+                    : "NOT_CREATED"),
+              ).toUpperCase()}
             </strong>{" "}
             · {p.engineering}
           </p>
           <p>
-            {p.free_connector
-              ? "Usa la conexión gratuita de Buffer de arriba. La integración directa sigue disponible como alternativa avanzada."
-              : String(p.blocker)}
+            {p.blocker === "BLOCKED_ACCOUNT_RECOVERY"
+              ? "Recupera tu cuenta de X antes de conectarla. No se creará ni conectará una cuenta."
+              : p.free_connector
+                ? "Usa la conexión gratuita de Buffer de arriba. La integración directa sigue disponible como alternativa avanzada."
+                : String(p.blocker)}
           </p>
           <p>
-            Conexión elegida: {String(p.transport)}
+            Conexión elegida: {String(p.account?.data.adapter ?? p.transport)}
             {p.transport === "buffer" ? ` · ${String(p.blocker)}` : ""}
           </p>
           <p>
@@ -249,9 +257,11 @@ export function AccountActivation({ initial }: { initial: State }) {
                 </p>
               </form>
             )}
-          <a href={p.signup} target="_blank" rel="noopener noreferrer">
-            Crear cuenta en el sitio oficial ↗
-          </a>
+          {p.blocker !== "BLOCKED_ACCOUNT_RECOVERY" && (
+            <a href={p.signup} target="_blank" rel="noopener noreferrer">
+              Crear cuenta en el sitio oficial ↗
+            </a>
+          )}
           <form
             key={`account:${p.account?.id ?? p.platform}:${p.account?.version ?? 0}`}
             onSubmit={(e) =>
@@ -270,7 +280,9 @@ export function AccountActivation({ initial }: { initial: State }) {
                 defaultValue={String(p.account?.data.handle ?? "")}
               />
             </label>
-            <button disabled={busy}>Registrar cuenta creada</button>
+            <button disabled={busy || p.blocker === "BLOCKED_ACCOUNT_RECOVERY"}>
+              Registrar cuenta creada
+            </button>
           </form>
           {p.account && (
             <>
@@ -349,7 +361,9 @@ export function AccountActivation({ initial }: { initial: State }) {
                     })
                   }
                 >
-                  Conectar {p.platform}
+                  {p.platform === "youtube"
+                    ? "Connect YouTube"
+                    : `Conectar ${p.platform}`}
                   {p.free_connector ? " (integración directa)" : ""}
                 </button>
               )}

@@ -483,6 +483,13 @@ export async function disconnectProvider(
     if (token.transport === "buffer")
       revoke =
         "Local credential removed. Disconnect the channel or revoke the shared key in Buffer settings when appropriate; other connected channels may use it.";
+    else if (
+      a.data.platform === "youtube" &&
+      process.env.GOOGLE_CLIENT_ID &&
+      process.env.YOUTUBE_CLIENT_ID === process.env.GOOGLE_CLIENT_ID
+    )
+      revoke =
+        "Local YouTube credential removed. Shared Google authorization preserved for Drive. Revoke BrainOS in Google account permissions to revoke all shared access, including Drive.";
     else
       await new OfficialClient(
         a.data.platform as Provider,
