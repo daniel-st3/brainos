@@ -5,6 +5,11 @@ const livePort = demoPort + 1;
 export default defineConfig({
   projects: [
     {
+      name: "approval-spine",
+      testDir: "tests/approval-e2e",
+      use: { baseURL: `http://localhost:${demoPort + 2}` },
+    },
+    {
       name: "mobile-controls",
       testDir: "tests/mobile-e2e",
       use: {
@@ -40,6 +45,18 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: [
+    {
+      command: `npm run start -- --port ${demoPort + 2}`,
+      url: `http://localhost:${demoPort + 2}`,
+      reuseExistingServer: false,
+      env: {
+        CONTENT_OS_MODE: "demo",
+        CONTENT_OS_DATA_MODE: "demo",
+        CONTENT_OS_DATA_DIR: ".data/e2e-approval",
+        CONTENT_OS_ORIGIN: `http://localhost:${demoPort + 2}`,
+      },
+      timeout: 60000,
+    },
     {
       command: `npm run start -- --port ${demoPort}`,
       url: `http://localhost:${demoPort}`,

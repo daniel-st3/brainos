@@ -38,6 +38,7 @@ import { providerToken } from "./auth";
 import { definitions } from "./definitions";
 import { Simulator, type Simulation } from "./simulator";
 interface ImmutablePayload extends Payload {
+  candidate_authorization?: { id: string; checksum: string };
   adapter_id?: string;
   account_external_id: string;
   content_id: string;
@@ -149,6 +150,14 @@ export async function enqueueOutbox(
     throw new ProviderError("BUFFER_CUSTOM_VIDEO_COVER_UNSUPPORTED");
   const immutable = {
     ...payload,
+    ...(c.data.final_approval.candidate_id
+      ? {
+          candidate_authorization: {
+            id: c.data.final_approval.candidate_id,
+            checksum: c.data.final_approval.candidate_checksum!,
+          },
+        }
+      : {}),
     adapter_id: adapter,
     graphic_refs: graphicRefs,
     account_external_id: a.data.external_id,
@@ -374,6 +383,33 @@ export async function processOutbox(
         const latest = await controlSnapshot(rpc, demo);
         const error = approvalError(latest);
         if (error) throw error;
+        if (row.payload.candidate_authorization) {
+          const { assertCurrent } = await import("../approval/service");
+          const candidate = latest.state.entities.find(
+            (e) => e.id === row.payload.candidate_authorization!.id,
+          );
+          const approval = latest.state.entities.find(
+            (e) => e.id === row.payload.content_id,
+          )?.data.final_approval as Content["final_approval"];
+          if (
+            !candidate ||
+            candidate.data.checksum !==
+              row.payload.candidate_authorization.checksum ||
+            !["APPROVED", "QUEUED"].includes(String(candidate.data.state)) ||
+            (candidate.data.decision as { decision?: string })?.decision !==
+              "approve" ||
+            approval?.candidate_id !== candidate.id ||
+            approval.candidate_checksum !== candidate.data.checksum
+          )
+            throw new ProviderError("EXACT_CANDIDATE_APPROVAL_REQUIRED");
+          const frozen = candidate.data.frozen as { due_at: string | null };
+          if (frozen.due_at && Date.parse(frozen.due_at) > Date.now())
+            throw new ProviderError("CANDIDATE_SCHEDULE_NOT_DUE");
+          assertCurrent(
+            latest,
+            candidate as unknown as import("../approval/service").Review,
+          );
+        }
         const account = latest.state.entities.find(
           (e) => e.id === row.account_id && e.kind === "account",
         ) as unknown as Entity<Account> | undefined;

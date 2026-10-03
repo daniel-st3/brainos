@@ -1,3 +1,9 @@
+import Link from "next/link";
+import { readControl } from "@/control/service";
+import { applicationRpc } from "@/ingestion/store";
+import { dataMode } from "@/server/mode";
+import { isReview } from "@/approval/service";
+import type { Candidate } from "@/approval/model";
 import { newsroom } from "@/server/data";
 import { PageHeader, Empty } from "@/components/ui";
 import { ReviewPackage } from "@/components/story-panels";
@@ -5,6 +11,11 @@ export default async function Review() {
   const stories = (await newsroom()).filter(
     (s) => s.status === "review" && !s.archived,
   );
+  const state = await readControl(
+    await applicationRpc(),
+    dataMode() === "demo",
+  );
+  const candidates = state.entities.filter(isReview);
   return (
     <>
       <PageHeader
@@ -12,6 +23,16 @@ export default async function Review() {
         title="The final editorial call."
         description="Evidence, copy, angle and rights. One package. One exact revision."
       />
+      <section aria-label="Publication decisions">
+        {candidates.map((e) => (
+          <p key={e.id}>
+            <Link href={`/review/${e.id}`}>
+              {(e.data.frozen as Candidate["frozen"]).title}
+            </Link>{" "}
+            · {String(e.data.state).replaceAll("_", " ")}
+          </p>
+        ))}
+      </section>
       <div className="results-label">
         {stories.length} PACKAGES AWAITING YOUR DECISION
       </div>

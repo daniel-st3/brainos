@@ -97,6 +97,8 @@ export interface Content {
   claims_reviewed_at: string | null;
   revalidation_required: boolean;
   final_approval: {
+    candidate_id?: string;
+    candidate_checksum?: string;
     actor: string;
     at: string;
     fingerprint: string;

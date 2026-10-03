@@ -1911,3 +1911,53 @@ details[open] > :not(summary) {
     align-items: flex-start;
   }
 }
+
+/* Exact publication decisions: existing product tokens, no public creative styling. */
+.publication-review {
+  max-width: 48rem;
+  margin-inline: auto;
+}
+.publication-review > * + * {
+  margin-top: 1.5rem;
+}
+.publication-review h1 {
+  overflow-wrap: anywhere;
+}
+.publication-review code,
+.publication-review a {
+  overflow-wrap: anywhere;
+}
+.publication-media {
+  display: grid;
+  gap: 1rem;
+}
+.publication-media figure {
+  margin: 0;
+}
+.publication-media img,
+.publication-media video {
+  display: block;
+  width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+}
+.exact-caption {
+  white-space: pre-wrap;
+}
+.publication-decision {
+  border-top: 1px solid var(--border-default);
+  padding-block: 1rem;
+}
+.review-decision-buttons {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.review-decision-buttons button {
+  min-height: 48px;
+  white-space: normal;
+}
+.publication-decision textarea {
+  width: 100%;
+  min-height: 6rem;
+}
