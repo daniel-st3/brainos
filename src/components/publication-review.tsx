@@ -102,6 +102,13 @@ export function PublicationReview({ id }: { id: string }) {
             : "Publish after your approval"}
         </p>
       </header>
+      {open && (
+        <p>
+          <a className="button secondary" href="#publication-decision">
+            Review decision
+          </a>
+        </p>
+      )}
       {!view.current && (
         <p role="alert">
           This candidate is stale. Prepare a new revision before approving.
@@ -184,7 +191,11 @@ export function PublicationReview({ id }: { id: string }) {
       {mediaError && (
         <p role="alert">Final media could not load. Reload before approving.</p>
       )}
-      <section className="publication-decision" aria-label="Your decision">
+      <section
+        id="publication-decision"
+        className="publication-decision"
+        aria-label="Your decision"
+      >
         <p role="status">
           {view.decision
             ? `Decision saved: ${view.decision.decision.replaceAll("_", " ")}. ${view.outbox_id ? "Handed to the guarded outbox; receipt appears after dispatch." : ""}`
@@ -203,7 +214,7 @@ export function PublicationReview({ id }: { id: string }) {
             />
             <div className="review-decision-buttons">
               <button
-                className="button-primary"
+                className="button"
                 disabled={
                   busy ||
                   !view.current ||
@@ -215,10 +226,18 @@ export function PublicationReview({ id }: { id: string }) {
               >
                 {frozen.due_at ? "APPROVE & SCHEDULE" : "APPROVE & PUBLISH"}
               </button>
-              <button disabled={busy} onClick={() => decide("request_changes")}>
+              <button
+                className="button secondary"
+                disabled={busy}
+                onClick={() => decide("request_changes")}
+              >
                 REQUEST CHANGES
               </button>
-              <button disabled={busy} onClick={() => decide("reject")}>
+              <button
+                className="button quiet"
+                disabled={busy}
+                onClick={() => decide("reject")}
+              >
                 REJECT
               </button>
             </div>

@@ -32,7 +32,8 @@ export function schedulerHealth(runs: AutomationRun[], now = Date.now()) {
           .filter((r) => r.lane === lane && r.event === "schedule")
           .sort((a, b) => b.window_at.localeCompare(a.window_at))[0];
       const grace = lane === "discovery" ? 45 * 60000 : 20 * 60000;
-      const covers = actual && actual.window_at >= expected;
+      const covers =
+        actual && Date.parse(actual.window_at) >= Date.parse(expected);
       return [
         lane,
         {
