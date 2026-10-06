@@ -2,12 +2,12 @@ import type { Provider } from "../control/model";
 import {
   ProviderError,
   type Identity,
-  type Payload,
   type Remote,
   type TokenSet,
   type Transport,
 } from "./client";
 import { validatePayload } from "./validation";
+import { instagramCarousel, type BufferPayload } from "./buffer-carousel";
 
 // Official contract, checked 2026-10-02:
 // https://developers.buffer.com/reference.md
@@ -370,8 +370,25 @@ export class BufferClient {
     };
   }
 
-  private input(account: string, payload: Payload, draft: boolean) {
-    const validation = validatePayload(this.provider, payload);
+  private input(account: string, payload: BufferPayload, draft: boolean) {
+    if (payload.carousel && this.provider !== "instagram")
+      throw new ProviderError("BUFFER_CAROUSEL_PLATFORM_UNSUPPORTED");
+    if (
+      payload.carousel &&
+      (payload.media || payload.media_urls.length || payload.images?.length)
+    )
+      throw new ProviderError("BUFFER_MEDIA_ORDER_AMBIGUOUS");
+    const carouselAssets = payload.carousel
+      ? instagramCarousel(payload.carousel)
+      : undefined;
+    // Validate common copy/count constraints without applying Reel-only rules
+    // to a video that is an explicitly ordered carousel child.
+    const validation = validatePayload(
+      this.provider,
+      payload.carousel
+        ? { ...payload, media_urls: payload.carousel.map((asset) => asset.url) }
+        : payload,
+    );
     const issues = validation.issues.filter(
       (issue) =>
         !(
@@ -385,9 +402,9 @@ export class BufferClient {
     if (payload.privacy)
       throw new ProviderError("BUFFER_PRIVACY_OVERRIDE_UNSUPPORTED");
     if (payload.media && payload.media_urls.length)
-      throw new ProviderError("BUFFER_MIXED_MEDIA_UNSUPPORTED");
+      throw new ProviderError("BUFFER_MEDIA_ORDER_REQUIRED");
     if (payload.media && payload.images?.length)
-      throw new ProviderError("BUFFER_MIXED_MEDIA_UNSUPPORTED");
+      throw new ProviderError("BUFFER_MEDIA_ORDER_REQUIRED");
     if (this.provider !== "x" && payload.thread.length)
       throw new ProviderError("BUFFER_THREAD_UNSUPPORTED");
     if (
@@ -494,7 +511,9 @@ export class BufferClient {
       (payload.caption.match(/#[\p{L}\p{N}_]+/gu) ?? []).length > 5
     )
       throw new ProviderError("BUFFER_TIKTOK_HASHTAG_LIMIT");
-    const urls = payload.media ? [payload.media.url] : payload.media_urls;
+    const urls =
+      payload.carousel?.map((asset) => asset.url) ??
+      (payload.media ? [payload.media.url] : payload.media_urls);
     for (const value of urls) {
       let url: URL;
       try {
@@ -520,9 +539,11 @@ export class BufferClient {
       )
         throw new ProviderError("STABLE_MEDIA_URL_REQUIRED");
     }
-    const assets = payload.media
-      ? [{ video: { url: payload.media.url } }]
-      : payload.media_urls.map((url) => ({ image: { url } }));
+    const assets =
+      carouselAssets ??
+      (payload.media
+        ? [{ video: { url: payload.media.url } }]
+        : payload.media_urls.map((url) => ({ image: { url } })));
     const mode = draft
       ? "draft"
       : (payload.delivery?.mode ?? (payload.publish_at ? "schedule" : "now"));
@@ -589,7 +610,7 @@ export class BufferClient {
 
   async publish(
     account: string,
-    payload: Payload,
+    payload: BufferPayload,
     remote: Remote = {},
     save: (r: Remote) => Promise<void> = async () => {},
   ): Promise<Remote> {
@@ -598,7 +619,7 @@ export class BufferClient {
 
   async createDraft(
     account: string,
-    payload: Payload,
+    payload: BufferPayload,
     remote: Remote = {},
     save: (r: Remote) => Promise<void> = async () => {},
   ): Promise<Remote> {
@@ -607,7 +628,7 @@ export class BufferClient {
 
   private async create(
     account: string,
-    payload: Payload,
+    payload: BufferPayload,
     remote: Remote,
     save: (r: Remote) => Promise<void>,
     draft: boolean,
@@ -741,7 +762,7 @@ export class BufferClient {
   async updateDraft(
     account: string,
     remote: Remote,
-    payload: Payload,
+    payload: BufferPayload,
     save: (r: Remote) => Promise<void> = async () => {},
   ): Promise<Remote> {
     this.account(account);

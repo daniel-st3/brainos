@@ -105,7 +105,7 @@ export function importedPublicationBlockers(
     value.media.some((m) => m.mime.startsWith("image/"))
   )
     blockers.push(
-      "BUFFER_MIXED_MEDIA_UNSUPPORTED: the connected path cannot send this exact video + image carousel.",
+      "Buffer accepts mixed image/video carousel drafts. This imported package still requires an approved publication binding and cleared rights before automated delivery.",
     );
   return blockers;
 }

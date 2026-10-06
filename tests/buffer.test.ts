@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { BufferClient, bufferApi } from "../src/providers/buffer-client";
+import type { BufferPayload } from "../src/providers/buffer-carousel";
 import type {
   Payload,
   Remote,
@@ -106,6 +107,151 @@ const success = (value: unknown) =>
   });
 
 describe("Buffer official free transport", () => {
+  const carousel: BufferPayload = {
+    ...payload,
+    caption: "Exact caption.\n\nFinal line.\n",
+    carousel: [
+      {
+        kind: "video",
+        ...video.media!,
+        width: 1080,
+        height: 1350,
+        duration: 4,
+        bytes: 841238,
+        sha256: "1".repeat(64),
+      },
+      ...["02", "03"].map((name) => ({
+        kind: "image" as const,
+        url: `https://fixture.supabase.co/functions/v1/approved-media/${name}.png?cap=opaque-fixture`,
+        mime: "image/png",
+        width: 1080,
+        height: 1350,
+        bytes: 632852,
+        sha256: name.slice(1).repeat(64),
+      })),
+    ],
+  };
+
+  it("preserves explicit mixed carousel order and exact caption without treating the child as a Reel", async () => {
+    const send = transport(
+      json({ data: { channel: channel("instagram") } }),
+      success(post({ channelService: "instagram", status: "draft" })),
+    );
+    const result = await new BufferClient(
+      "instagram",
+      token,
+      send,
+      true,
+    ).createDraft("buffer-channel-fixture", carousel);
+    expect(result.status).toBe("draft");
+    const input = requestBody(send, 1).variables.input;
+    expect(input).toMatchObject({
+      text: carousel.caption,
+      saveToDraft: true,
+      mode: "addToQueue",
+      metadata: { instagram: { type: "post", shouldShareToFeed: true } },
+      assets: [
+        {
+          video: {
+            url: carousel.carousel![0].url,
+            metadata: { thumbnailOffset: 0 },
+          },
+        },
+        { image: { url: carousel.carousel![1].url } },
+        { image: { url: carousel.carousel![2].url } },
+      ],
+    });
+    expect(input).not.toHaveProperty("dueAt");
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it("never sorts carousel children by media type", async () => {
+    const ordered = {
+      ...carousel,
+      carousel: [...carousel.carousel!].reverse(),
+    };
+    const send = transport(
+      json({ data: { channel: channel("instagram") } }),
+      success(post({ channelService: "instagram", status: "draft" })),
+    );
+    await new BufferClient("instagram", token, send, true).createDraft(
+      "buffer-channel-fixture",
+      ordered,
+    );
+    expect(requestBody(send, 1).variables.input.assets).toEqual([
+      { image: { url: ordered.carousel[0].url } },
+      { image: { url: ordered.carousel[1].url } },
+      {
+        video: {
+          url: ordered.carousel[2].url,
+          metadata: { thumbnailOffset: 0 },
+        },
+      },
+    ]);
+  });
+
+  it("rejects ambiguous ordering, missing checksums, cropping, invalid child media and unstable delivery URLs before network", async () => {
+    const send = transport();
+    const variants: BufferPayload[] = [
+      { ...carousel, media: video.media },
+      { ...carousel, media_urls: imagePayload.media_urls },
+      { ...carousel, carousel: [] },
+      { ...carousel, carousel: [carousel.carousel![0]] },
+      { ...carousel, carousel: Array(11).fill(carousel.carousel![0]) },
+      ...[
+        { sha256: "" },
+        { width: 100 },
+        { width: 1081 },
+        { mime: "image/svg+xml" },
+        { bytes: 8_000_001 },
+        { url: "https://localhost/private.png" },
+        {
+          url: "https://fixture.supabase.co/storage/v1/object/sign/private.png?token=test",
+        },
+      ].map((patch) => ({
+        ...carousel,
+        carousel: [
+          carousel.carousel![0],
+          { ...carousel.carousel![1], ...patch },
+          carousel.carousel![2],
+        ],
+      })),
+      {
+        ...carousel,
+        carousel: [
+          {
+            ...video.media!,
+            kind: "video",
+            width: 1080,
+            height: 1350,
+            sha256: "1".repeat(64),
+            duration: NaN,
+          },
+          ...carousel.carousel!.slice(1),
+        ],
+      },
+    ];
+    for (const value of variants)
+      await expect(
+        new BufferClient("instagram", token, send, true).createDraft(
+          "buffer-channel-fixture",
+          value,
+        ),
+      ).rejects.toBeInstanceOf(Error);
+    await expect(
+      new BufferClient("tiktok", token, send, true).createDraft(
+        "buffer-channel-fixture",
+        carousel,
+      ),
+    ).rejects.toMatchObject({ code: "BUFFER_CAROUSEL_PLATFORM_UNSUPPORTED" });
+    await expect(
+      new BufferClient("instagram", token, send).createDraft(
+        "buffer-channel-fixture",
+        carousel,
+      ),
+    ).rejects.toMatchObject({ code: "EXTERNAL_PUBLISHING_DISABLED" });
+    expect(send).not.toHaveBeenCalled();
+  });
   it("rejects unsupported platforms and missing/expired credentials before network access", async () => {
     const send = transport();
     expect(() => new BufferClient("youtube", token, send)).toThrow(

@@ -153,7 +153,7 @@ function freeze(
     }
   }
   if (adapter === "buffer" && output && graphics.length)
-    throw Error("BUFFER_MIXED_MEDIA_UNSUPPORTED");
+    throw Error("BUFFER_MEDIA_ORDER_REQUIRED");
   if (
     media.some(
       (m) =>
