@@ -258,7 +258,7 @@ export async function createCandidate(
     version: 1,
     parent_id: frozen.content_id,
     story_id: frozen.story_id,
-    draft_id: frozen.draft_id,
+    draft_id: frozen.draft_id || null,
     is_demo: demo,
     data: {
       type: "cloud_approval_v1",
@@ -277,7 +277,7 @@ export async function createCandidate(
     kind: "notification",
     version: 1,
     story_id: frozen.story_id,
-    draft_id: frozen.draft_id,
+    draft_id: frozen.draft_id || null,
     parent_id: id,
     is_demo: demo,
     data: {

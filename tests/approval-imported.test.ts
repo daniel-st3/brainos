@@ -68,7 +68,14 @@ async function fixture() {
       {
         ...p,
         version: p.version + 1,
-        data: { ...p.data, status: "draft", caption, imported },
+        data: {
+          ...p.data,
+          status: "draft",
+          draft_id: "",
+          draft_revision: 0,
+          caption,
+          imported,
+        },
       },
     ],
     p_jobs: [],
@@ -94,6 +101,7 @@ it("imports pending rights without approval, preserves exact caption/order/bytes
     "UNCLEAR",
   );
   expect(f.review.data.state).toBe("AWAITING_DANIEL");
+  expect(f.review.draft_id).toBeNull();
   expect(f.review.data.decision).toBeNull();
   expect((await createCandidate(rpc, f.packageId, null, true)).id).toBe(
     f.review.id,
