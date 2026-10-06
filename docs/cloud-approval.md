@@ -50,3 +50,9 @@ YouTube's private-only audit limit and beehiiv's Posts plan limit remain blocker
 Tests must distinguish local contracts from hosted proof. Hosted proof creates candidates through deployed Vercel, checks persisted waiting/queued records, invokes the existing Supabase-hosted dispatch function (no local outbox executor), closes the setup/browser process, and then reads receipts from Supabase. Before-due and after-due snapshots must retain the same immutable schedule. Never label a simulator receipt a real social publication.
 
 Official references: [Gmail send](https://developers.google.com/workspace/gmail/api/guides/sending), [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes), [incremental Google authorization](https://developers.google.com/identity/protocols/oauth2/web-server#incrementalAuth).
+
+## Exact externally prepared packages
+
+An operator may attach an `external-publication-package/v1` manifest to an existing private package. The original archive, caption digest, ordered media, first-frame poster, source/claim/rights manifests and factual recheck are frozen into the existing approval candidate. Import does not fabricate draft or rights approvals. Private media remain in `brainos-production`; nothing is rasterized or re-encoded.
+
+These packages are **review-only** until a compatible release path is explicitly implemented and validated. Daniel can approve the exact creative, request changes or reject. Creative approval does not clear rights, set final publication authority, or enqueue an outbox row. Both resume and direct outbox enqueue enforce this restriction. The review prominently shows rights and transport blockers. Existing supported production packages retain their original approval/publishing behavior.

@@ -13,6 +13,7 @@ type View = {
   state: string;
   decision: Candidate["decision"];
   current: boolean;
+  blockers?: string[];
   cloud: boolean;
   outbox_id: string | null;
   expires_at: string | null;
@@ -99,9 +100,32 @@ export function PublicationReview({ id }: { id: string }) {
         <p>
           {frozen.due_at
             ? `Scheduled: ${new Date(frozen.due_at).toLocaleString()}`
-            : "Publish after your approval"}
+            : frozen.imported
+              ? "Private review · publication blocked"
+              : "Publish after your approval"}
         </p>
       </header>
+      {frozen.imported && (
+        <section role="alert" aria-label="Rights and publication blockers">
+          <h2>
+            Rights risk: {frozen.imported.manifests.rights.overall_risk} ·
+            UNCLEAR
+          </h2>
+          <p>
+            Creative revision: {frozen.imported.revision}. These original files
+            have not been altered.
+          </p>
+          <ul>
+            {(view.blockers ?? []).map((b) => (
+              <li key={b}>{b}</li>
+            ))}
+          </ul>
+          <p>
+            Approval records your review only. It will not enqueue or publish
+            this package.
+          </p>
+        </section>
+      )}
       {open && (
         <p>
           <a className="button secondary" href="#publication-decision">
@@ -120,6 +144,11 @@ export function PublicationReview({ id }: { id: string }) {
             {m.mime.startsWith("video/") ? (
               <video
                 controls
+                poster={
+                  frozen.imported?.poster && i === 0
+                    ? `/api/approvals/${id}/media?index=0&poster=true`
+                    : undefined
+                }
                 onLoadedMetadata={() =>
                   setLoadedMedia((current) => [...new Set([...current, i])])
                 }
@@ -158,8 +187,9 @@ export function PublicationReview({ id }: { id: string }) {
       <details>
         <summary>Sources, rights and exact version</summary>
         <p>
-          Rights and current evidence are required before this candidate is
-          created and checked again before sending.
+          {frozen.imported
+            ? "Original source/rights manifests are bound to this candidate. Rights remain unresolved; no publication authority has been granted."
+            : "Rights and current evidence are required before this candidate is created and checked again before sending."}
         </p>
         {frozen.sources.map((url) => (
           <p key={url}>
@@ -170,7 +200,10 @@ export function PublicationReview({ id }: { id: string }) {
         ))}
         <p>
           Content revision {frozen.content_version} · Package revision{" "}
-          {frozen.package_version} · Draft revision {frozen.draft_revision}
+          {frozen.package_version} ·{" "}
+          {frozen.imported
+            ? frozen.imported.revision
+            : `Draft revision ${frozen.draft_revision}`}
         </p>
         <code>{view.checksum}</code>
         <p>Candidate: {id}</p>
@@ -192,7 +225,9 @@ export function PublicationReview({ id }: { id: string }) {
           {view.decision
             ? `Decision saved: ${view.decision.decision.replaceAll("_", " ")}. ${view.outbox_id ? "Handed to the guarded outbox; receipt appears after dispatch." : ""}`
             : open
-              ? "Only your approval allows this exact package to be sent."
+              ? frozen.imported
+                ? "Your decision applies to this exact creative. Publication remains blocked."
+                : "Only your approval allows this exact package to be sent."
               : "This review is closed."}
         </p>
         {open && (
@@ -215,7 +250,11 @@ export function PublicationReview({ id }: { id: string }) {
                 }
                 onClick={() => decide("approve")}
               >
-                {frozen.due_at ? "APPROVE & SCHEDULE" : "APPROVE & PUBLISH"}
+                {frozen.imported
+                  ? "APPROVE"
+                  : frozen.due_at
+                    ? "APPROVE & SCHEDULE"
+                    : "APPROVE & PUBLISH"}
               </button>
               <button
                 className="button secondary"

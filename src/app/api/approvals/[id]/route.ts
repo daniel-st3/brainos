@@ -9,6 +9,7 @@ import {
   findReview,
   resumeCandidate,
 } from "@/approval/service";
+import { importedPublicationBlockers } from "@/approval/imported";
 import { notificationStatus } from "@/approval/notifications";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ id: string }> };
@@ -38,6 +39,12 @@ export async function GET(_request: Request, context: Context) {
           Date.parse(row.data.expires_at) <= Date.now(),
         outbox_id: row.data.outbox_id,
         current,
+        blockers: row.data.frozen.imported
+          ? importedPublicationBlockers(
+              row.data.frozen.imported,
+              row.data.frozen.adapter,
+            )
+          : [],
         cloud: process.env.CONTENT_OS_MODE === "supabase",
         notification: await notificationStatus(rpc),
       },

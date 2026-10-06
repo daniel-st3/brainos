@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ImportedPackage } from "./imported";
 export const decisionInput = z
   .object({
     checksum: z.string().regex(/^[a-f0-9]{64}$/),
@@ -40,6 +41,7 @@ export interface Candidate {
     media: ReviewMedia[];
     binding: string;
     simulated: boolean;
+    imported?: ImportedPackage;
   };
   state:
     | "AWAITING_DANIEL"

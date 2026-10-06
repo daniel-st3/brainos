@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { editor } from "@/server/auth";
 import { applicationRpc } from "@/ingestion/store";
+import type { ReviewMedia } from "@/approval/model";
 import { findReview } from "@/approval/service";
 import { storageClient } from "@/integrations/media";
 import { rasterBytes } from "@/providers/raster";
@@ -16,7 +17,10 @@ export async function GET(
     );
     const index = Number(new URL(request.url).searchParams.get("index"));
     if (!Number.isInteger(index) || index < 0) throw Error("Missing media");
-    const file = row.data.frozen.media[index];
+    const file: ReviewMedia | undefined =
+      new URL(request.url).searchParams.get("poster") === "true"
+        ? row.data.frozen.imported?.poster
+        : row.data.frozen.media[index];
     if (!file) throw Error("Missing media");
     if (
       process.env.CONTENT_OS_MODE !== "supabase" &&

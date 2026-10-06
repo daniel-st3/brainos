@@ -6,6 +6,10 @@ import { enqueueOutbox, payloadChecksum } from "../providers/outbox";
 import { resolveDistributionAdapter } from "../providers/routing";
 import { externalWritesAllowed } from "../providers/publishing-policy";
 import { decisionInput, type Candidate, type ReviewMedia } from "./model";
+import {
+  validateImportedPackage,
+  importedPublicationBlockers,
+} from "./imported";
 type Snapshot = Awaited<ReturnType<typeof controlSnapshot>>;
 export type Review = Entity<Candidate>;
 export const isReview = (e: Entity): boolean =>
@@ -33,6 +37,59 @@ function freeze(
     (e) => e.id === p?.parent_id && e.kind === "content",
   ) as unknown as Entity<Content>;
   if (!p || !c) throw Error("PACKAGE_NOT_FOUND");
+  const imported = (p.data as Package & { imported?: unknown }).imported;
+  if (imported) {
+    const source = validateImportedPackage(imported, p.id, p.data.caption);
+    const a = s.state.entities.find(
+      (e) => e.kind === "account" && e.data.platform === p.data.platform,
+    ) as unknown as Entity<Account>;
+    const story = s.stories.find((x) => x.id === c.story_id);
+    if (
+      !story ||
+      !a ||
+      a.is_demo !== demo ||
+      a.data.status !== "connected" ||
+      !a.data.external_id
+    )
+      throw Error("CONNECTED_REVIEW_TARGET_REQUIRED");
+    const {
+      final_approval,
+      distribution_state,
+      analytics_state,
+      production_state,
+      ...editorial
+    } = c.data;
+    void final_approval;
+    void distribution_state;
+    void analytics_state;
+    void production_state;
+    return {
+      package_id: p.id,
+      package_version: p.version,
+      content_id: c.id,
+      content_version: c.version,
+      story_id: story.id,
+      draft_id: p.data.draft_id,
+      draft_revision: p.data.draft_revision,
+      title: p.data.title,
+      caption: p.data.caption,
+      thread: p.data.thread,
+      platform: p.data.platform,
+      account_id: a.id,
+      account_external_id: a.data.external_id,
+      handle: a.data.handle,
+      adapter:
+        a.data.delivery_transport === "buffer"
+          ? "buffer"
+          : `${a.data.platform}_direct`,
+      due_at: due,
+      sources: p.data.source_links,
+      media: source.media,
+      imported: source,
+      simulated: demo,
+      binding: payloadChecksum({ editorial, story, package: p }),
+    };
+  }
   const check = readiness(c, s.state, s.stories, s.production, p.id);
   if (!check.ready)
     throw Error("CANDIDATE_NOT_READY: " + check.issues.join("; "));
@@ -339,19 +396,21 @@ export async function decideCandidate(
       version: c.version + 1,
       data: {
         ...c.data,
-        distribution_state: "ready",
-        final_approval: {
-          actor,
-          at: now,
-          fingerprint: (
-            s.state.entities.find((e) => e.id === d.frozen.package_id)!
-              .data as unknown as Package
-          ).fingerprint,
-          package_id: d.frozen.package_id,
-          package_version: d.frozen.package_version,
-          candidate_id: row.id,
-          candidate_checksum: d.checksum,
-        },
+        distribution_state: d.frozen.imported ? "blocked" : "ready",
+        final_approval: d.frozen.imported
+          ? null
+          : {
+              actor,
+              at: now,
+              fingerprint: (
+                s.state.entities.find((e) => e.id === d.frozen.package_id)!
+                  .data as unknown as Package
+              ).fingerprint,
+              package_id: d.frozen.package_id,
+              package_version: d.frozen.package_version,
+              candidate_id: row.id,
+              candidate_checksum: d.checksum,
+            },
       },
     });
   if (input.decision === "request_changes")
@@ -400,6 +459,17 @@ export async function resumeCandidate(rpc: Rpc, id: string) {
     !["APPROVED", "QUEUED"].includes(r.data.state)
   )
     return { state: r.data.state, outbox_id: null };
+  if (r.data.frozen.imported) {
+    assertCurrent(await controlSnapshot(rpc, r.is_demo), r);
+    return {
+      state: r.data.state,
+      outbox_id: null,
+      blockers: importedPublicationBlockers(
+        r.data.frozen.imported,
+        r.data.frozen.adapter,
+      ),
+    };
+  }
   if (r.data.outbox_id) return { state: "QUEUED", outbox_id: r.data.outbox_id };
   const s = await controlSnapshot(rpc, r.is_demo);
   assertCurrent(s, r);

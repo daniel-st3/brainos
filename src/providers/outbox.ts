@@ -92,6 +92,8 @@ export async function enqueueOutbox(
       (e) => e.id === packageId && e.kind === "package",
     ) as unknown as Entity<Package> | undefined;
   if (!p) throw Error("Package missing");
+  if ((p.data as Package & { imported?: unknown }).imported)
+    throw Error("IMPORTED_PACKAGE_REVIEW_ONLY");
   const c = state.entities.find(
       (e) => e.id === p.parent_id,
     ) as unknown as Entity<Content>,
