@@ -1943,6 +1943,7 @@ details[open] > :not(summary) {
 }
 .exact-caption {
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .publication-decision {
   border-top: 1px solid var(--border-default);
