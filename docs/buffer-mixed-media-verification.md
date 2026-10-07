@@ -1,5 +1,27 @@
 # Buffer mixed Instagram media — 2026-10-06
 
+## Final disposition
+
+Retain implementation commit `5a5156ea31bb54ddb31bb23b547627fc14b31ff6`.
+
+- Buffer mixed-media Instagram carousel support: **VERIFIED**.
+- Previous BrainOS blanket mixed-media guard: **STALE / FIXED**.
+- Exact MP4 + PNG + PNG ordering: **supported by Buffer API**, verified with
+  the private draft test and cleanup below.
+- Downstream byte preservation: **not guaranteed**.
+- Ghost Core creative: **review candidate only**.
+- Ghost media rights: **MEDIUM / UNCLEAR**.
+- Live Instagram delivery: **not yet tested**.
+
+If Daniel approves Ghost's creative, preserve that exact candidate-bound
+approval. Do not publish while media rights remain unresolved. Do not alter
+the creative, add a generic rights override, or build Meta direct publishing.
+
+The next milestone is the **first live DVNI post with publishable media**, using
+a separate candidate with a clear publication basis for its media. This is not
+authorization to publish that future candidate. No further engineering is
+planned unless it exposes another concrete blocker.
+
 ## Observed, without social publication
 
 The [September 28 release](https://buffer.com/changelog/mixed-media-posts)

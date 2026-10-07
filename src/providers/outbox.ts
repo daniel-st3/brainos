@@ -30,6 +30,11 @@ import {
   type Transport,
 } from "./client";
 import { BufferClient } from "./buffer-client";
+import type { BufferPayload } from "./buffer-carousel";
+import {
+  licensedImageMedia,
+  validateImportedPackage,
+} from "../approval/imported";
 import { resolveDistributionAdapter } from "./routing";
 import { externalWritesAllowed } from "./publishing-policy";
 import { providerClient } from "./factory";
@@ -37,7 +42,8 @@ import { deliveryUrl } from "./delivery";
 import { providerToken } from "./auth";
 import { definitions } from "./definitions";
 import { Simulator, type Simulation } from "./simulator";
-interface ImmutablePayload extends Payload {
+interface ImmutablePayload extends BufferPayload {
+  imported_refs?: ReturnType<typeof licensedImageMedia>;
   candidate_authorization?: { id: string; checksum: string };
   adapter_id?: string;
   account_external_id: string;
@@ -92,15 +98,20 @@ export async function enqueueOutbox(
       (e) => e.id === packageId && e.kind === "package",
     ) as unknown as Entity<Package> | undefined;
   if (!p) throw Error("Package missing");
-  if ((p.data as Package & { imported?: unknown }).imported)
-    throw Error("IMPORTED_PACKAGE_REVIEW_ONLY");
+  const rawImport = (p.data as Package & { imported?: unknown }).imported;
+  const imported = rawImport
+    ? validateImportedPackage(rawImport, p.id, p.data.caption)
+    : null;
+  const importedRefs = imported ? licensedImageMedia(imported) : undefined;
   const c = state.entities.find(
       (e) => e.id === p.parent_id,
     ) as unknown as Entity<Content>,
     a = state.entities.find(
       (e) => e.kind === "account" && e.data.platform === p.data.platform,
     ) as unknown as Entity<Account> | undefined;
-  const check = readiness(c, state, stories, production, p.id);
+  const check = importedRefs
+    ? { ready: true, issues: [] }
+    : readiness(c, state, stories, production, p.id);
   if (
     !check.ready ||
     c.data.final_approval?.package_id !== p.id ||
@@ -110,6 +121,25 @@ export async function enqueueOutbox(
       "Exact final approval/current evidence/rights required: " +
         check.issues.join("; "),
     );
+  if (importedRefs) {
+    const review = state.entities.find(
+      (e) => e.id === c.data.final_approval?.candidate_id,
+    );
+    if (
+      !review ||
+      review.data.checksum !== c.data.final_approval?.candidate_checksum ||
+      (review.data.decision as { decision?: string })?.decision !== "approve" ||
+      !["APPROVED", "QUEUED"].includes(String(review.data.state))
+    )
+      throw Error("EXACT_CANDIDATE_APPROVAL_REQUIRED");
+    const { assertCurrent } = await import("../approval/service");
+    assertCurrent(
+      { state, stories, production } as Awaited<
+        ReturnType<typeof controlSnapshot>
+      >,
+      review as unknown as import("../approval/service").Review,
+    );
+  }
   if (!a || a.data.status !== "connected" || !a.data.external_id)
     throw new ProviderError("AUTH_REQUIRED");
   if (!a.data.capabilities.includes("publish"))
@@ -162,6 +192,7 @@ export async function enqueueOutbox(
       : {}),
     adapter_id: adapter,
     graphic_refs: graphicRefs,
+    ...(importedRefs ? { imported_refs: importedRefs } : {}),
     account_external_id: a.data.external_id,
     content_id: c.id,
     content_fingerprint: c.data.final_approval.fingerprint,
@@ -195,6 +226,20 @@ export async function enqueueOutbox(
 }
 export async function dispatchInputs(rpc: Rpc, row: Outbox, send: Transport) {
   const p = { ...row.payload };
+  if (p.imported_refs) {
+    if (
+      row.provider !== "instagram" ||
+      !["buffer", "simulator"].includes(row.payload.adapter_id ?? "")
+    )
+      throw new ProviderError("LICENSED_CAROUSEL_TARGET_REQUIRED");
+    p.carousel = [];
+    for (const [i, file] of p.imported_refs.entries())
+      p.carousel.push({
+        ...file,
+        kind: "image",
+        url: await deliveryUrl(rpc, row.id, `imported:${i}`, file),
+      });
+  }
   // Preserve the immutable requested schedule, but keep future approval control
   // in BrainOS. Only a due, freshly validated request reaches Buffer shareNow.
   if (p.delivery && ["schedule", "queue"].includes(p.delivery.mode))
@@ -351,7 +396,19 @@ export async function processOutbox(
         )
           return new ProviderError("IMMUTABLE_PAYLOAD_MISMATCH");
         try {
-          if (
+          const imported = (pkg.data as Package & { imported?: unknown })
+            .imported;
+          if (imported) {
+            const files = licensedImageMedia(
+              validateImportedPackage(imported, pkg.id, pkg.data.caption),
+            );
+            if (
+              payloadChecksum(files) !==
+                payloadChecksum(row.payload.imported_refs) ||
+              !row.payload.candidate_authorization
+            )
+              return new ProviderError("IMMUTABLE_PAYLOAD_MISMATCH");
+          } else if (
             !readiness(
               content,
               current.state,

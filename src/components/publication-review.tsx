@@ -84,6 +84,8 @@ export function PublicationReview({ id }: { id: string }) {
       </section>
     );
   const frozen = view.frozen;
+  const reviewOnly = !!frozen.imported && !frozen.imported.publication;
+  const conditions = frozen.imported?.manifests.rights.conditions;
   const open = view.state === "AWAITING_DANIEL" && !view.expired;
   return (
     <article className="publication-review">
@@ -100,7 +102,7 @@ export function PublicationReview({ id }: { id: string }) {
         <p>
           {frozen.due_at
             ? `Scheduled: ${new Date(frozen.due_at).toLocaleString()}`
-            : frozen.imported
+            : reviewOnly
               ? "Private review · publication blocked"
               : "Publish after your approval"}
         </p>
@@ -108,8 +110,9 @@ export function PublicationReview({ id }: { id: string }) {
       {frozen.imported && (
         <section role="alert" aria-label="Rights and publication blockers">
           <h2>
-            Rights risk: {frozen.imported.manifests.rights.overall_risk} ·
-            UNCLEAR
+            {reviewOnly
+              ? `Rights risk: ${frozen.imported.manifests.rights.overall_risk} · UNCLEAR`
+              : "Rights: CLEARED for the proposed use"}
           </h2>
           <p>
             Creative revision: {frozen.imported.revision}. These original files
@@ -120,9 +123,22 @@ export function PublicationReview({ id }: { id: string }) {
               <li key={b}>{b}</li>
             ))}
           </ul>
+          {Array.isArray(conditions) && (
+            <ul aria-label="Attribution and share-alike obligations">
+              {conditions.map((condition, i) => (
+                <li key={i}>{String(condition)}</li>
+              ))}
+            </ul>
+          )}
           <p>
-            Approval records your review only. It will not enqueue or publish
-            this package.
+            {reviewOnly ? (
+              <>
+                Approval records your review only. It will not enqueue or
+                publish this package.
+              </>
+            ) : (
+              "Approval authorizes this exact carousel and its complete attribution caption for the guarded publication outbox."
+            )}
           </p>
         </section>
       )}
@@ -187,7 +203,7 @@ export function PublicationReview({ id }: { id: string }) {
       <details>
         <summary>Sources, rights and exact version</summary>
         <p>
-          {frozen.imported
+          {reviewOnly
             ? "Original source/rights manifests are bound to this candidate. Rights remain unresolved; no publication authority has been granted."
             : "Rights and current evidence are required before this candidate is created and checked again before sending."}
         </p>
@@ -225,7 +241,7 @@ export function PublicationReview({ id }: { id: string }) {
           {view.decision
             ? `Decision saved: ${view.decision.decision.replaceAll("_", " ")}. ${view.outbox_id ? "Handed to the guarded outbox; receipt appears after dispatch." : ""}`
             : open
-              ? frozen.imported
+              ? reviewOnly
                 ? "Your decision applies to this exact creative. Publication remains blocked."
                 : "Only your approval allows this exact package to be sent."
               : "This review is closed."}
@@ -250,7 +266,7 @@ export function PublicationReview({ id }: { id: string }) {
                 }
                 onClick={() => decide("approve")}
               >
-                {frozen.imported
+                {reviewOnly
                   ? "APPROVE"
                   : frozen.due_at
                     ? "APPROVE & SCHEDULE"

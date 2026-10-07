@@ -9,7 +9,9 @@ import { decisionInput, type Candidate, type ReviewMedia } from "./model";
 import {
   validateImportedPackage,
   importedPublicationBlockers,
+  licensedImageMedia,
 } from "./imported";
+import { instagramCarousel } from "../providers/buffer-carousel";
 type Snapshot = Awaited<ReturnType<typeof controlSnapshot>>;
 export type Review = Entity<Candidate>;
 export const isReview = (e: Entity): boolean =>
@@ -52,6 +54,32 @@ function freeze(
       !a.data.external_id
     )
       throw Error("CONNECTED_REVIEW_TARGET_REQUIRED");
+    const simulated =
+      demo &&
+      a.is_demo &&
+      !!(a.data as Account & { simulation?: string }).simulation;
+    if (source.publication) {
+      if (demo && !simulated) throw Error("STAGING_SIMULATOR_REQUIRED");
+      const images = licensedImageMedia(source);
+      if (
+        p.data.platform !== "instagram" ||
+        p.data.caption.length > 2200 ||
+        !p.data.caption.trim() ||
+        (!simulated &&
+          (resolveDistributionAdapter(p.data, a.data).adapter !== "buffer" ||
+            !externalWritesAllowed(
+              a.data as unknown as Record<string, unknown>,
+            )))
+      )
+        throw Error("LICENSED_CAROUSEL_TARGET_REQUIRED");
+      instagramCarousel(
+        images.map((m) => ({
+          ...m,
+          kind: "image",
+          url: "https://validation.invalid/media",
+        })),
+      );
+    }
     const {
       final_approval,
       distribution_state,
@@ -79,9 +107,11 @@ function freeze(
       account_external_id: a.data.external_id,
       handle: a.data.handle,
       adapter:
-        a.data.delivery_transport === "buffer"
-          ? "buffer"
-          : `${a.data.platform}_direct`,
+        simulated && source.publication
+          ? "simulator"
+          : a.data.delivery_transport === "buffer"
+            ? "buffer"
+            : `${a.data.platform}_direct`,
       due_at: due,
       sources: p.data.source_links,
       media: source.media,
@@ -396,21 +426,25 @@ export async function decideCandidate(
       version: c.version + 1,
       data: {
         ...c.data,
-        distribution_state: d.frozen.imported ? "blocked" : "ready",
-        final_approval: d.frozen.imported
-          ? null
-          : {
-              actor,
-              at: now,
-              fingerprint: (
-                s.state.entities.find((e) => e.id === d.frozen.package_id)!
-                  .data as unknown as Package
-              ).fingerprint,
-              package_id: d.frozen.package_id,
-              package_version: d.frozen.package_version,
-              candidate_id: row.id,
-              candidate_checksum: d.checksum,
-            },
+        distribution_state:
+          d.frozen.imported && !d.frozen.imported.publication
+            ? "blocked"
+            : "ready",
+        final_approval:
+          d.frozen.imported && !d.frozen.imported.publication
+            ? null
+            : {
+                actor,
+                at: now,
+                fingerprint: (
+                  s.state.entities.find((e) => e.id === d.frozen.package_id)!
+                    .data as unknown as Package
+                ).fingerprint,
+                package_id: d.frozen.package_id,
+                package_version: d.frozen.package_version,
+                candidate_id: row.id,
+                candidate_checksum: d.checksum,
+              },
       },
     });
   if (input.decision === "request_changes")
@@ -459,7 +493,7 @@ export async function resumeCandidate(rpc: Rpc, id: string) {
     !["APPROVED", "QUEUED"].includes(r.data.state)
   )
     return { state: r.data.state, outbox_id: null };
-  if (r.data.frozen.imported) {
+  if (r.data.frozen.imported && !r.data.frozen.imported.publication) {
     assertCurrent(await controlSnapshot(rpc, r.is_demo), r);
     return {
       state: r.data.state,
