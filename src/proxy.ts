@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
+  // Scheduler bearer is verified by this route; GET still requires editor().
+  if (request.nextUrl.pathname === "/api/creator-discovery")
+    return NextResponse.next();
   if (
     [
       "/about",
