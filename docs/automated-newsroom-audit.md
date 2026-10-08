@@ -77,3 +77,20 @@ This pass does not prove scheduled discovery → final creative → review email
 - https://developers.buffer.com/guides/api-limits.html
 - https://developers.buffer.com/reference.html
 - https://supabase.com/docs/guides/cron/quickstart
+
+## Deployment notes
+
+- Preview: https://brainos-ok4z7muyl-daniel-st3s-projects.vercel.app/creator-briefs (application code afa001c).
+- Deployment-only BRAINOS_CREATOR_STAGING=true; no project-wide editorial credentials added.
+- Vercel's generated project alias moved despite autoAssignCustomDomains:false. It was immediately restored to prior deployment dpl_EAoghiqpUBYRguh9Zk9YmgzuG1Si and verified. The creator cron is pinned to the unique preview URL; no production deployment/promotion was requested.
+- Supabase dispatcher reads the separate brainos_creator_staging_origin Vault entry and existing scheduler bearer/bypass. It cannot fall back to the live app. Original discovery and operations timers are untouched.
+- 466 unit tests; 27 E2E; lint/typecheck/build passed. DB validation passed with 43 RLS tables. Sandbox IPC restrictions required running DB/E2E checks with local test-server permission, not an application change.
+
+## Hosted proof
+
+- Supabase cron job started at 2026-10-08T21:41:00Z, while no local discovery runner was running.
+- Hosted slot 2026-10-08T21 completed at 21:41:02.469739Z; 6/6 feeds healthy, 100 retained briefs, two research leads. Stored snapshot 118,454 bytes. Not a final creative candidate.
+- Repeated hosted request 163 returned HTTP 200 / ALREADY_CLAIMED; no duplicate snapshot or email.
+- Temporary per-minute proof timer removed. Active creator staging schedule: `0 13,15,19,22 * * *` UTC = 08:00/10:00/14:00/17:00 Bogotá. Existing `30 11 * * *` and `17 * * * *` timers unchanged.
+- Deployed authenticated GET returned 200; anonymous GET and POST returned 401. Desktop and 390px screenshots inspected; no horizontal overflow, no publication/approval controls.
+- No final candidate, Gmail notification, media render or social publication was created by this experiment. The requested complete unattended creative-production success condition remains unproven.
