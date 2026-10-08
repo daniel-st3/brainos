@@ -5,8 +5,8 @@ Starting HEAD: ff8d158e58ce1032c4c935f4e296cece1ce728ad.
 ## Observed production system
 
 - Supabase Cron: discovery 11:30 UTC (06:30 Bogotá); operations hourly at :17. October 8 discovery sources succeeded. Original registry/scoring/pilot remain unchanged through October 13.
-- Approved Wikimedia candidate 76b364c4-969c-4e92-a9d7-5646d018f032 has published outbox 40a8cf8d-2931-4f15-97d4-ee1c42defddc and publication a9616a9b-b453-4ad4-9cd5-e96b80b2a1cb. Buffer 6ac5b9b1b6dcff802a066171 is sent: https://www.instagram.com/p/DeLX74rHJX3/. Read-only checks, no retry or new post.
-- Day-one analytics job succeeded; day-three/day-seven jobs remain scheduled. Buffer snapshot at 2026-10-08T07:21:01Z: 8 views, reach 5, one reaction. These are an early snapshot, not performance conclusions.
+- The approved first Wikimedia candidate has a reconciled publication receipt. Its Buffer post is sent. Exact internal IDs and private metrics remain in the local audit evidence, not this public repository. Read-only checks, no retry or new post.
+- Day-one analytics job succeeded; day-three/day-seven jobs remain scheduled. A real Buffer metrics snapshot was returned. No performance conclusions drawn from this early snapshot.
 - Encrypted Google connection, Gmail notification CAS claims and immutable final candidate/outbox are working infrastructure. Existing email is title plus authenticated link; rich inline media/caption email is NOT implemented.
 - Local worker heartbeat current; transcription/render jobs still depend on that worker. It is not a cloud creative executor. C2's face-led Reel was not touched.
 - Existing research and caption drafting use deterministic code, not an unattended editorial language model. Existing SVG/Sharp cards are not suitable substitutes for the requested creative quality.
@@ -48,7 +48,7 @@ DVNI Taste Profile V1 was read from C2's existing artifact. No C2 files, fonts, 
 - Thumbnail: API explicitly rejects custom thumbnailUrl; supports video metadata.thumbnailOffset for an embedded frame. BrainOS currently chooses frame zero. No promise of arbitrary custom cover upload.
 - Music: experimental audio catalog exists, but this account returned ChannelRefreshRequired. InstagramPostMetadataInput has no audio attachment field; stickerFields.music is reminder/manual metadata. Automated Instagram music selection is NOT verified. Prefer legitimately licensed audio mixed into final MP4, with retained provenance, once renderer exists.
 - Scheduled publishing exists through existing guarded outbox due_at; no new schedule/post was created.
-- Metrics query worked against the real published post. Free key policies read live: 100/15 minutes, 250/day, 3,000/30 days. At 21:34 UTC remaining: 99/232/2883. Count existing hourly health and reconciliation, not just posts, before scaling.
+- Metrics query worked against the real published post. Free key policies read live: 100/15 minutes, 250/day, 3,000/30 days. Count existing hourly health and reconciliation, not just posts, before scaling.
 
 ## Costs and limits
 
@@ -82,7 +82,7 @@ This pass does not prove scheduled discovery → final creative → review email
 
 - Preview: https://brainos-ok4z7muyl-daniel-st3s-projects.vercel.app/creator-briefs (application code afa001c).
 - Deployment-only BRAINOS_CREATOR_STAGING=true; no project-wide editorial credentials added.
-- Vercel's generated project alias moved despite autoAssignCustomDomains:false. It was immediately restored to prior deployment dpl_EAoghiqpUBYRguh9Zk9YmgzuG1Si and verified. The creator cron is pinned to the unique preview URL; no production deployment/promotion was requested.
+- Vercel's generated project alias moved despite autoAssignCustomDomains:false. It was immediately restored to its prior deployment and verified. The creator cron is pinned to the unique preview URL; no production deployment/promotion was requested.
 - Supabase dispatcher reads the separate brainos_creator_staging_origin Vault entry and existing scheduler bearer/bypass. It cannot fall back to the live app. Original discovery and operations timers are untouched.
 - 466 unit tests; 27 E2E; lint/typecheck/build passed. DB validation passed with 43 RLS tables. Sandbox IPC restrictions required running DB/E2E checks with local test-server permission, not an application change.
 
