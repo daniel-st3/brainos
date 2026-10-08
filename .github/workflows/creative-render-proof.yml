@@ -1,0 +1,33 @@
+name: Private creative render proof
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-creative-render-proof
+  cancel-in-progress: false
+jobs:
+  render:
+    # Standard runner in this public repository; no larger paid runner.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - name: Fetch fixed official demo for private processing only
+        run: |
+          mkdir -p .data/phase2/render
+          curl --fail --silent --show-error --max-time 45 --max-filesize 20000000 \
+            https://developers.google.com/static/edge/foresight/assets/enhanced-notetaking.gif \
+            -o .data/phase2/render/source.gif
+      - name: Render and decode-check held research artifact
+        run: node scripts/experiments/foresight-render.mjs
+      - name: Remove ephemeral renderer files
+        if: always()
+        run: rm -rf .data/phase2/render .data/phase2/private-render.zip
