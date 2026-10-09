@@ -269,13 +269,13 @@ export async function produce(snapshot, directory) {
     qa = await codexJSON({
       name: `visual-qa-${revision}`,
       directory,
-      images: mobile,
+      images: [...mobile, ...assetImages],
       schema: object({
         pass: { type: "boolean" },
         findings: { type: "array", items: str },
         limitations: { type: "array", items: str },
       }),
-      prompt: `Independently review these THREE final rendered slides at PHONE SIZE. Release quality is not rendering success. Reject weak generic title cards, dense unreadable body text, clipped/overlapping typography, decorative irrelevant media, misleading reconstructed UI, lack of story-specific authentic visual protagonist, repetitive layouts. Verify exact Spanish copy and claims against supplied primary evidence. Do not excuse poor design to meet a quota. Pass only if a coherent professional editorial carousel suitable for Daniel's review. Rights remain UNCLEAR and always block publication separately; assess visual/editorial readiness, not legal clearance. Return pass, concrete findings and limitations.\n${JSON.stringify({ caption: p.caption, claims: p.claims, source_excerpt: excerpt })}`,
+      prompt: `Independently review the FIRST THREE images, which are final rendered slides at PHONE SIZE. Remaining images are the authentic source assets fetched by the controller from the source page; compare crops against those originals. Asset URLs and checksums below are host-recorded provenance, not generated assertions. Release quality is not rendering success. Reject weak generic title cards, dense unreadable body text, clipped/overlapping typography, decorative irrelevant media, misleading reconstructed UI, lack of story-specific authentic visual protagonist, repetitive layouts. Verify exact Spanish copy and claims against supplied primary evidence. Do not excuse poor design to meet a quota. Pass only if a coherent professional editorial carousel suitable for Daniel's review. Rights remain UNCLEAR and always block publication separately; assess visual/editorial readiness, not legal clearance. Return pass, concrete findings and limitations.\n${JSON.stringify({ caption: p.caption, claims: p.claims, source_excerpt: excerpt, source_url: sourceURL, source_assets: assets })}`,
     });
     metrics.push(qa.metrics);
     if (qa.value.pass) break;

@@ -16,7 +16,7 @@ The existing creator snapshot can enqueue one `control_jobs.kind=creative` job w
 
 `BRAINOS_AUTONOMOUS_STAGING=true` enables this staging experiment. Leave it OFF on the normal discovery deployment until the first complete quality run is accepted. Queue at most one unfinished job. No production cadence or four-post quota is enabled. Pilot records/ranking are unchanged.
 
-Pipeline: existing scheduled snapshot → model selection → primary source retrieval (record unavailable sources, no access-control workaround) → authentic source images → evidence-bound Spanish copy → per-story SVG composition → native 1080×1350 PNGs → independent model review of actual 390px images → at most one revision → private upload/checksum verification → existing immutable review → existing Gmail delivery.
+Pipeline: existing scheduled snapshot → model selection → primary source retrieval (record unavailable sources, no access-control workaround) → authentic source images → evidence-bound Spanish copy → per-story SVG composition → native 1080×1350 PNGs → independent model review of actual 390px images against original source images, URLs and checksums → at most one revision → private upload/checksum verification → existing immutable review → existing Gmail delivery.
 
 This first renderer handles a three-image carousel only. It does NOT implement premium video, narration, sound design, subtitles or new multi-platform exports. The source assets remain UNCLEAR. The worker cannot clear rights, supply a publication binding, approve anything, or invoke Buffer. Its real-story candidates are in isolated staging/private review; a visual pass does not establish live publication eligibility. A failed quality gate creates NO candidate and sends NO “ready” email.
 
