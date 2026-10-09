@@ -55,3 +55,17 @@ Installer copies runtime/dependencies into Application Support, but no Codex aut
 - Make: free plan currently advertises 1,000 credits/month, two active scenarios, 15-minute minimum scheduling and five-minute execution (https://www.make.com/en/pricing). It does not solve rendering quality or spare-host authentication. Not introduced.
 
 Calendar, additional sources, API reads and cross-platform exports remain deferred behind the first genuine quality candidate. No generic rights override was added.
+
+## Observed proof — 8 October 2026, Bogotá
+
+Application preview: https://brainos-newsroom-daniel-st3s-projects.vercel.app (application commit `9bf1cc4e5f03dce6977b788fc3d00cbf52c0c240`). The normal BrainOS alias was not moved. Only this new staging alias has a Vercel protection exception; private app routes still require editor auth, and candidate routes require their scoped grant.
+
+Hosted job `16569ff3-8b4b-4bfe-b687-d486f8eb83dc` consumed an existing scheduled creator snapshot. Its first attempt failed creative QA and created no candidate. Daniel explicitly authorized one corrected attempt after the QA input was fixed to include original source imagery. That attempt completed without an interactive model conversation or manual media import, producing **Gemini recibe el encargo**, three exact 1080×1350 PNGs and a 73-word Spanish caption.
+
+Candidate `545e2b3d-a817-4356-a24f-545ca12e5c3a` is AWAITING_DANIEL, in private staging, with no decision or outbox. Gmail retained SENT at `2026-10-09T02:25:21.446Z`. This proves Gmail acceptance, not inbox arrival. Source-media rights remain UNCLEAR; this candidate is NOT eligible for publication. A visual QA pass is not Daniel's approval or a final DVNI style standard.
+
+Corrected attempt: 323.095 seconds research/render/QA, approximately 332.493 seconds including hosted handoff, 3 Codex calls, 115,371 reported input tokens (46,720 cached), 9,105 reported output tokens. Failed attempts consumed additional allowance and are retained separately in private proof files. No incremental paid API calls. The executor ran on the main Mac for this test; spare-Mac installation and main-Mac-independent execution remain UNPROVEN.
+
+Hosted phone (390px) and desktop checks verified all three images, no overflow, no secret in URL history, HttpOnly/Secure/Strict candidate-path cookie, 401 for invalid/wrong-candidate access, 403 for cross-origin exchange, and unchanged decision/outbox after viewing. The email's secret fragment is intentionally not stored in this document.
+
+Validation: 484 unit tests, 28 browser tests, lint, typecheck, build and 43-table RLS validation passed locally. GitHub CI passed for the application commit above. Live state remained three published outbox entries, no pending live retry; original discovery/operations/creator schedules were unchanged. No recurring creative production was enabled. Premium video, source-media publication eligibility, and an always-available spare executor remain separate unmet release requirements.
