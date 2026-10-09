@@ -86,6 +86,9 @@ export async function POST(request: Request, context: Context) {
     const message = e instanceof Error ? e.message : "";
     const known = [
       "Unauthorized",
+      "NEO_OWNER_REQUIRED",
+      "NEO_RISK_ACKNOWLEDGMENT_REQUIRED",
+      "NEO_EXACT_SCOPE_REQUIRED",
       "STALE_CANDIDATE",
       "DECISION_ALREADY_RECORDED",
       "REVIEW_CLOSED",

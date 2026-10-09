@@ -1,6 +1,7 @@
 /** Exact external packages may enter private review without acquiring publish authority. */
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { neoOwnerMedia } from "./neo-publication";
 import { documentedReelMedia } from "./reel-publication";
 const sha = z.string().regex(/^[a-f0-9]{64}$/);
 const file = z.object({
@@ -27,6 +28,7 @@ export const importedPackageSchema = z.object({
     .object({
       kind: z.enum([
         "licensed-image-carousel/v1",
+        "neo-owner-risk-carousel/v1",
         "documented-instagram-reel/v1",
       ]),
       thumbnail_offset_ms: z.number().int().nonnegative().optional(),
@@ -264,6 +266,8 @@ export function publicationMedia(value: ImportedPackage): (ReturnType<
   codec?: string;
   thumbnail_offset_ms?: number;
 })[] {
+  if (value.publication?.kind === "neo-owner-risk-carousel/v1")
+    return neoOwnerMedia(value);
   return value.publication?.kind === "documented-instagram-reel/v1"
     ? documentedReelMedia(value)
     : licensedImageMedia(value);

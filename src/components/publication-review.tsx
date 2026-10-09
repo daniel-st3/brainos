@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { neoPolicy } from "@/approval/neo-policy";
 import type { Candidate } from "@/approval/model";
 type View = {
   id: string;
@@ -20,6 +21,7 @@ type View = {
   expired: boolean;
 };
 export function PublicationReview({ id }: { id: string }) {
+  const [riskAccepted, setRiskAccepted] = useState(false);
   const [loadedMedia, setLoadedMedia] = useState<number[]>([]);
   const [mediaError, setMediaError] = useState(false);
   const [view, setView] = useState<View | null>(null),
@@ -56,7 +58,16 @@ export function PublicationReview({ id }: { id: string }) {
       const r = await fetch(`/api/approvals/${id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ checksum: view.checksum, decision, feedback }),
+        body: JSON.stringify({
+          checksum: view.checksum,
+          decision,
+          feedback,
+          ...(decision === "approve" &&
+          view.frozen.imported?.publication?.kind === neoPolicy.kind &&
+          riskAccepted
+            ? { neo_risk_acknowledgment: neoPolicy.id }
+            : {}),
+        }),
       });
       const result = await r.json();
       if (!r.ok) throw Error(result.error);
@@ -85,6 +96,7 @@ export function PublicationReview({ id }: { id: string }) {
     );
   const frozen = view.frozen;
   const reviewOnly = !!frozen.imported && !frozen.imported.publication;
+  const neoRisk = frozen.imported?.publication?.kind === neoPolicy.kind;
   const documentedReel =
     frozen.imported?.publication?.kind === "documented-instagram-reel/v1";
   const conditions = frozen.imported?.manifests.rights.conditions;
@@ -114,10 +126,13 @@ export function PublicationReview({ id }: { id: string }) {
           <h2>
             {reviewOnly
               ? `Rights risk: ${frozen.imported.manifests.rights.overall_risk} · UNCLEAR`
-              : documentedReel
-                ? `Rights basis documented · residual risk: ${frozen.imported?.manifests.rights.overall_risk}. No permission or legal clearance implied.`
-                : "Rights: CLEARED for the proposed use"}
+              : neoRisk
+                ? "Derechos UNCLEAR · decisión de riesgo del propietario"
+                : documentedReel
+                  ? `Rights basis documented · residual risk: ${frozen.imported?.manifests.rights.overall_risk}. No permission or legal clearance implied.`
+                  : "Rights: CLEARED for the proposed use"}
           </h2>
+          {neoRisk && <p>{neoPolicy.disclosure}</p>}
           <p>
             Creative revision: {frozen.imported.revision}. These original files
             have not been altered.
@@ -140,6 +155,8 @@ export function PublicationReview({ id }: { id: string }) {
                 Approval records your review only. It will not enqueue or
                 publish this package.
               </>
+            ) : neoRisk ? (
+              "Solo Daniel puede autorizar este candidato exacto aceptando expresamente el riesgo. Esta autorización no concede una licencia ni aclara los derechos."
             ) : documentedReel ? (
               "Approval authorizes this exact Reel, selected video-frame cover and caption on the documented publication basis, including the disclosed residual risks."
             ) : (
@@ -209,9 +226,11 @@ export function PublicationReview({ id }: { id: string }) {
       <details>
         <summary>Sources, rights and exact version</summary>
         <p>
-          {reviewOnly
-            ? "Original source/rights manifests are bound to this candidate. Rights remain unresolved; no publication authority has been granted."
-            : "Rights and current evidence are required before this candidate is created and checked again before sending."}
+          {neoRisk
+            ? "Los documentos de fuentes y derechos originales se conservan. Derechos UNCLEAR, incluso después de aprobar."
+            : reviewOnly
+              ? "Original source/rights manifests are bound to this candidate. Rights remain unresolved; no publication authority has been granted."
+              : "Rights and current evidence are required before this candidate is created and checked again before sending."}
         </p>
         {frozen.sources.map((url) => (
           <p key={url}>
@@ -252,6 +271,13 @@ export function PublicationReview({ id }: { id: string }) {
                 : "Only your approval allows this exact package to be sent."
               : "This review is closed."}
         </p>
+        {view.decision?.risk_acknowledgment && (
+          <p>
+            Riesgo reconocido por el propietario ·{" "}
+            {view.decision.risk_acknowledgment.at} · candidato{" "}
+            {view.decision.risk_acknowledgment.candidate_id}
+          </p>
+        )}
         {open && (
           <>
             <label htmlFor="review-feedback">Notes / requested changes</label>
@@ -261,12 +287,23 @@ export function PublicationReview({ id }: { id: string }) {
               maxLength={4000}
               onChange={(e) => setFeedback(e.target.value)}
             />
+            {neoRisk && (
+              <label>
+                <input
+                  type="checkbox"
+                  checked={riskAccepted}
+                  onChange={(e) => setRiskAccepted(e.target.checked)}
+                />
+                {neoPolicy.acknowledgment}
+              </label>
+            )}
             <div className="review-decision-buttons">
               <button
                 className="button"
                 disabled={
                   busy ||
                   !view.current ||
+                  (neoRisk && !riskAccepted) ||
                   mediaError ||
                   loadedMedia.length < frozen.media.length
                 }

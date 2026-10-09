@@ -1,3 +1,4 @@
+import { assertNeoAcknowledgment } from "../approval/neo-publication";
 import { randomUUID, createHash } from "node:crypto";
 import type { Rpc } from "../ingestion/store";
 import { controlSnapshot, readiness } from "../control/service";
@@ -132,6 +133,9 @@ export async function enqueueOutbox(
       !["APPROVED", "QUEUED"].includes(String(review.data.state))
     )
       throw Error("EXACT_CANDIDATE_APPROVAL_REQUIRED");
+    assertNeoAcknowledgment(
+      review as unknown as import("../approval/service").Review,
+    );
     const { assertCurrent } = await import("../approval/service");
     assertCurrent(
       { state, stories, production } as Awaited<
@@ -473,6 +477,9 @@ export async function processOutbox(
             approval.candidate_checksum !== candidate.data.checksum
           )
             throw new ProviderError("EXACT_CANDIDATE_APPROVAL_REQUIRED");
+          assertNeoAcknowledgment(
+            candidate as unknown as import("../approval/service").Review,
+          );
           const frozen = candidate.data.frozen as { due_at: string | null };
           if (frozen.due_at && Date.parse(frozen.due_at) > Date.now())
             throw new ProviderError("CANDIDATE_SCHEDULE_NOT_DUE");

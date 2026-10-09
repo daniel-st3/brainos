@@ -1,3 +1,10 @@
+import { neoPolicy } from "./neo-policy";
+import {
+  isNeoRisk,
+  assertNeoScope,
+  neoAcknowledgment,
+  assertNeoAcknowledgment,
+} from "./neo-publication";
 import { randomUUID } from "node:crypto";
 import type { Rpc } from "../ingestion/store";
 import { controlSnapshot, readControl, readiness } from "../control/service";
@@ -72,7 +79,11 @@ function freeze(
             )))
       )
         throw Error("LICENSED_CAROUSEL_TARGET_REQUIRED");
-      if (source.publication.kind === "licensed-image-carousel/v1")
+      if (
+        ["licensed-image-carousel/v1", neoPolicy.kind].includes(
+          source.publication.kind,
+        )
+      )
         instagramCarousel(
           images.map((m) => ({
             ...m,
@@ -92,7 +103,7 @@ function freeze(
     void distribution_state;
     void analytics_state;
     void production_state;
-    return {
+    const frozen: Candidate["frozen"] = {
       package_id: p.id,
       package_version: p.version,
       content_id: c.id,
@@ -120,6 +131,8 @@ function freeze(
       simulated: demo,
       binding: payloadChecksum({ editorial, story, package: p }),
     };
+    assertNeoScope(frozen);
+    return frozen;
   }
   const check = readiness(c, s.state, s.stories, s.production, p.id);
   if (!check.ready)
@@ -381,6 +394,15 @@ export async function decideCandidate(
   const input = decisionInput.parse(raw),
     row = await findReview(rpc, id),
     d = row.data;
+  if (isNeoRisk(d.frozen.imported)) {
+    if (actor !== neoPolicy.owner_id) throw Error("NEO_OWNER_REQUIRED");
+    if (
+      input.decision === "approve" &&
+      input.neo_risk_acknowledgment !== neoPolicy.id
+    )
+      throw Error("NEO_RISK_ACKNOWLEDGMENT_REQUIRED");
+  } else if (input.neo_risk_acknowledgment)
+    throw Error("NEO_EXACT_SCOPE_REQUIRED");
   if (input.checksum !== d.checksum) throw Error("STALE_CANDIDATE");
   if (d.decision) {
     if (
@@ -416,7 +438,14 @@ export async function decideCandidate(
           : input.decision === "reject"
             ? "REJECTED"
             : "REQUEST_CHANGES",
-      decision: { ...input, actor, at: now },
+      decision: {
+        ...input,
+        actor,
+        at: now,
+        ...(isNeoRisk(d.frozen.imported) && input.decision === "approve"
+          ? { risk_acknowledgment: neoAcknowledgment(id, d, actor, now) }
+          : {}),
+      },
     },
   };
   const c = s.state.entities.find((e) => e.id === d.frozen.content_id)!;
@@ -494,6 +523,7 @@ export async function resumeCandidate(rpc: Rpc, id: string) {
     !["APPROVED", "QUEUED"].includes(r.data.state)
   )
     return { state: r.data.state, outbox_id: null };
+  assertNeoAcknowledgment(r);
   if (r.data.frozen.imported && !r.data.frozen.imported.publication) {
     assertCurrent(await controlSnapshot(rpc, r.is_demo), r);
     return {

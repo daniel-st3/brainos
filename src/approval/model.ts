@@ -5,6 +5,7 @@ export const decisionInput = z
     checksum: z.string().regex(/^[a-f0-9]{64}$/),
     decision: z.enum(["approve", "request_changes", "reject"]),
     feedback: z.string().max(4000).default(""),
+    neo_risk_acknowledgment: z.string().max(100).optional(),
   })
   .strict();
 export type DecisionInput = z.infer<typeof decisionInput>;
@@ -58,6 +59,19 @@ export interface Candidate {
     actor: string;
     at: string;
     feedback: string;
+    neo_risk_acknowledgment?: string;
+    risk_acknowledgment?: {
+      policy_id: string;
+      candidate_id: string;
+      candidate_checksum: string;
+      owner_id: string;
+      at: string;
+      rights_status: "UNCLEAR";
+      caption_sha256: string;
+      ordered_media_sha256: string[];
+      disclosure: string;
+      statement: string;
+    };
   };
   wait_token_id: string | null;
   outbox_id: string | null;
