@@ -41,6 +41,7 @@ export interface Payload {
     bytes: number;
     mime: string;
     duration: number;
+    thumbnail_offset_ms?: number;
     width: number;
     height: number;
     codec: string;

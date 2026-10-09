@@ -32,7 +32,7 @@ import {
 import { BufferClient } from "./buffer-client";
 import type { BufferPayload } from "./buffer-carousel";
 import {
-  licensedImageMedia,
+  publicationMedia,
   validateImportedPackage,
 } from "../approval/imported";
 import { resolveDistributionAdapter } from "./routing";
@@ -43,7 +43,7 @@ import { providerToken } from "./auth";
 import { definitions } from "./definitions";
 import { Simulator, type Simulation } from "./simulator";
 interface ImmutablePayload extends BufferPayload {
-  imported_refs?: ReturnType<typeof licensedImageMedia>;
+  imported_refs?: ReturnType<typeof publicationMedia>;
   candidate_authorization?: { id: string; checksum: string };
   adapter_id?: string;
   account_external_id: string;
@@ -102,7 +102,7 @@ export async function enqueueOutbox(
   const imported = rawImport
     ? validateImportedPackage(rawImport, p.id, p.data.caption)
     : null;
-  const importedRefs = imported ? licensedImageMedia(imported) : undefined;
+  const importedRefs = imported ? publicationMedia(imported) : undefined;
   const c = state.entities.find(
       (e) => e.id === p.parent_id,
     ) as unknown as Entity<Content>,
@@ -232,13 +232,25 @@ export async function dispatchInputs(rpc: Rpc, row: Outbox, send: Transport) {
       !["buffer", "simulator"].includes(row.payload.adapter_id ?? "")
     )
       throw new ProviderError("LICENSED_CAROUSEL_TARGET_REQUIRED");
-    p.carousel = [];
-    for (const [i, file] of p.imported_refs.entries())
-      p.carousel.push({
-        ...file,
-        kind: "image",
-        url: await deliveryUrl(rpc, row.id, `imported:${i}`, file),
-      });
+    const reel = p.imported_refs[0];
+    if (reel?.duration !== undefined) {
+      if (p.imported_refs.length !== 1 || !reel.codec)
+        throw new ProviderError("EXACT_REEL_MEDIA_BINDING_REQUIRED");
+      p.media = {
+        ...reel,
+        duration: reel.duration,
+        codec: reel.codec,
+        url: await deliveryUrl(rpc, row.id, "imported:0", reel),
+      };
+    } else {
+      p.carousel = [];
+      for (const [i, file] of p.imported_refs.entries())
+        p.carousel.push({
+          ...file,
+          kind: "image",
+          url: await deliveryUrl(rpc, row.id, `imported:${i}`, file),
+        });
+    }
   }
   // Preserve the immutable requested schedule, but keep future approval control
   // in BrainOS. Only a due, freshly validated request reaches Buffer shareNow.
@@ -399,7 +411,7 @@ export async function processOutbox(
           const imported = (pkg.data as Package & { imported?: unknown })
             .imported;
           if (imported) {
-            const files = licensedImageMedia(
+            const files = publicationMedia(
               validateImportedPackage(imported, pkg.id, pkg.data.caption),
             );
             if (

@@ -85,6 +85,8 @@ export function PublicationReview({ id }: { id: string }) {
     );
   const frozen = view.frozen;
   const reviewOnly = !!frozen.imported && !frozen.imported.publication;
+  const documentedReel =
+    frozen.imported?.publication?.kind === "documented-instagram-reel/v1";
   const conditions = frozen.imported?.manifests.rights.conditions;
   const open = view.state === "AWAITING_DANIEL" && !view.expired;
   return (
@@ -112,7 +114,9 @@ export function PublicationReview({ id }: { id: string }) {
           <h2>
             {reviewOnly
               ? `Rights risk: ${frozen.imported.manifests.rights.overall_risk} · UNCLEAR`
-              : "Rights: CLEARED for the proposed use"}
+              : documentedReel
+                ? `Rights basis documented · residual risk: ${frozen.imported?.manifests.rights.overall_risk}. No permission or legal clearance implied.`
+                : "Rights: CLEARED for the proposed use"}
           </h2>
           <p>
             Creative revision: {frozen.imported.revision}. These original files
@@ -136,6 +140,8 @@ export function PublicationReview({ id }: { id: string }) {
                 Approval records your review only. It will not enqueue or
                 publish this package.
               </>
+            ) : documentedReel ? (
+              "Approval authorizes this exact Reel, selected video-frame cover and caption on the documented publication basis, including the disclosed residual risks."
             ) : (
               "Approval authorizes this exact carousel and its complete attribution caption for the guarded publication outbox."
             )}

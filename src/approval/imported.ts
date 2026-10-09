@@ -1,6 +1,7 @@
 /** Exact external packages may enter private review without acquiring publish authority. */
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { documentedReelMedia } from "./reel-publication";
 const sha = z.string().regex(/^[a-f0-9]{64}$/);
 const file = z.object({
   file_id: z.string().min(1),
@@ -24,7 +25,11 @@ export const importedPackageSchema = z.object({
   files: z.array(file).min(1).max(100),
   publication: z
     .object({
-      kind: z.literal("licensed-image-carousel/v1"),
+      kind: z.enum([
+        "licensed-image-carousel/v1",
+        "documented-instagram-reel/v1",
+      ]),
+      thumbnail_offset_ms: z.number().int().nonnegative().optional(),
       platform: z.literal("instagram"),
       fresh_until: z.iso.datetime(),
       documents: z
@@ -107,10 +112,10 @@ export function importedPublicationBlockers(
 ) {
   if (value.publication) {
     try {
-      licensedImageMedia(value);
+      publicationMedia(value);
     } catch {
       return [
-        "Licensed image publication binding is invalid or stale; prepare a new reviewed revision.",
+        "Publication binding is invalid or stale; prepare a new reviewed revision.",
       ];
     }
     return ["buffer", "simulator"].includes(adapter)
@@ -250,4 +255,16 @@ export function licensedImageMedia(value: ImportedPackage) {
       throw Error("EXACT_LICENSED_IMAGE_BINDING_REQUIRED");
     return { ...m, width: f.dimensions[0], height: f.dimensions[1] };
   });
+}
+
+export function publicationMedia(value: ImportedPackage): (ReturnType<
+  typeof licensedImageMedia
+>[number] & {
+  duration?: number;
+  codec?: string;
+  thumbnail_offset_ms?: number;
+})[] {
+  return value.publication?.kind === "documented-instagram-reel/v1"
+    ? documentedReelMedia(value)
+    : licensedImageMedia(value);
 }

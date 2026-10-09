@@ -539,10 +539,31 @@ export class BufferClient {
       )
         throw new ProviderError("STABLE_MEDIA_URL_REQUIRED");
     }
+    if (
+      payload.media?.thumbnail_offset_ms !== undefined &&
+      (this.provider !== "instagram" ||
+        !Number.isSafeInteger(payload.media.thumbnail_offset_ms) ||
+        payload.media.thumbnail_offset_ms < 0 ||
+        payload.media.thumbnail_offset_ms >= payload.media.duration * 1000)
+    )
+      throw new ProviderError("BUFFER_THUMBNAIL_OFFSET_INVALID");
     const assets =
       carouselAssets ??
       (payload.media
-        ? [{ video: { url: payload.media.url } }]
+        ? [
+            {
+              video: {
+                url: payload.media.url,
+                ...(payload.media.thumbnail_offset_ms !== undefined
+                  ? {
+                      metadata: {
+                        thumbnailOffset: payload.media.thumbnail_offset_ms,
+                      },
+                    }
+                  : {}),
+              },
+            },
+          ]
         : payload.media_urls.map((url) => ({ image: { url } })));
     const mode = draft
       ? "draft"

@@ -9,7 +9,7 @@ import { decisionInput, type Candidate, type ReviewMedia } from "./model";
 import {
   validateImportedPackage,
   importedPublicationBlockers,
-  licensedImageMedia,
+  publicationMedia,
 } from "./imported";
 import { instagramCarousel } from "../providers/buffer-carousel";
 type Snapshot = Awaited<ReturnType<typeof controlSnapshot>>;
@@ -60,7 +60,7 @@ function freeze(
       !!(a.data as Account & { simulation?: string }).simulation;
     if (source.publication) {
       if (demo && !simulated) throw Error("STAGING_SIMULATOR_REQUIRED");
-      const images = licensedImageMedia(source);
+      const images = publicationMedia(source);
       if (
         p.data.platform !== "instagram" ||
         p.data.caption.length > 2200 ||
@@ -72,13 +72,14 @@ function freeze(
             )))
       )
         throw Error("LICENSED_CAROUSEL_TARGET_REQUIRED");
-      instagramCarousel(
-        images.map((m) => ({
-          ...m,
-          kind: "image",
-          url: "https://validation.invalid/media",
-        })),
-      );
+      if (source.publication.kind === "licensed-image-carousel/v1")
+        instagramCarousel(
+          images.map((m) => ({
+            ...m,
+            kind: "image",
+            url: "https://validation.invalid/media",
+          })),
+        );
     }
     const {
       final_approval,
