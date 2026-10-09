@@ -69,3 +69,28 @@ Corrected attempt: 323.095 seconds research/render/QA, approximately 332.493 sec
 Hosted phone (390px) and desktop checks verified all three images, no overflow, no secret in URL history, HttpOnly/Secure/Strict candidate-path cookie, 401 for invalid/wrong-candidate access, 403 for cross-origin exchange, and unchanged decision/outbox after viewing. The email's secret fragment is intentionally not stored in this document.
 
 Validation: 484 unit tests, 28 browser tests, lint, typecheck, build and 43-table RLS validation passed locally. GitHub CI passed for the application commit above. Live state remained three published outbox entries, no pending live retry; original discovery/operations/creator schedules were unchanged. No recurring creative production was enabled. Premium video, source-media publication eligibility, and an always-available spare executor remain separate unmet release requirements.
+
+## Efficiency measurement and spare-worker hardening — 8 October 2026
+
+Original successful run, `gpt-6.1-sol` / high reasoning / CLI `0.162.0-alpha.2`:
+
+| Call        |   Input | Output | Cached input (subset) | Reported total | Seconds |
+| ----------- | ------: | -----: | --------------------: | -------------: | ------: |
+| Selection   |  20,983 |    336 |                     0 |         21,319 |  15.869 |
+| Composition |  21,832 |  7,529 |                     0 |         29,361 | 248.636 |
+| Visual QA   |  72,556 |  1,240 |                46,720 |         73,796 |  56.717 |
+| Total       | 115,371 |  9,105 |                46,720 |        124,476 | 321.222 |
+
+Overall worker completion took 332.493 seconds including retrieval/render/upload/email. There were no tool events or documentation reads in any model call. QA emitted an extra progress message before its final JSON. The 40,000-character primary excerpt was repeated for composition and independent QA. Fresh sessions also carried general runtime instructions/context. Aggregate CLI usage does not identify an exact token charge for each instruction/image/internal pass, so these are observed contributors, not a fabricated per-component accounting.
+
+Each invocation now checks that local authentication still uses ChatGPT and fails closed if it has changed to API-key login. The worker now uses a concise task-specific `model_instructions_file`, disables plugin/hook/memory features, disables project document injection, and requests one final structured response with no progress preamble. The same model, high reasoning, output schemas, source evidence, original images, independent QA criteria, rights rules and iteration limits remain. No source excerpt was shortened, originals removed, or quality gate relaxed. Metrics now also retain prompt/schema/instruction hashes, input image hashes/bytes, visible error count and agent-message count.
+
+**Measured QA-only replay:** same unchanged Gemini media, all three originals, all three phone-size images, complete source excerpt and caption. 18,400 input + 1,103 output = **19,503 reported tokens**, zero cached, zero tool events, one final message, zero visible errors; **46.756 seconds**. This is **73.57% fewer reported QA tokens** and **17.56% less QA wall time**. Both reviews passed for Daniel's private review and independently flagged small credits, the vendor-evidence limitation and unresolved rights. This single replay does not prove aesthetic acceptance, general quality equivalence or full-pipeline savings. Cached tokens are already included in input; reported token savings are not a claim of equivalent subscription-quota or dollar savings.
+
+Private measurement evidence: `.data/autonomous-proof/efficiency-qa-v1/comparison.json`, metrics and event log. Replay prompt SHA-256 `3d4c700bde01ceb9c738f36efb9385b5d4fdf937f5b2ff12833780594853636a`; instructions SHA-256 `5c8378c9b2587510f0c466c9b77af04797859dc171f0e9afe6c8886a0901ff63`. Original package and candidate were not modified; no new candidate, email, render or hosted job was created. The next complete creative run and whole-pipeline measurement wait for Daniel's feedback.
+
+Repeat only when authorized, using `node --import ./node_modules/tsx/dist/loader.mjs scripts/newsroom/measure-qa.mjs <existing-proof-directory> <new-empty-output-directory>`. This helper cannot enqueue, upload, notify or publish. It verifies original media checksums before QA and unchanged input hashes afterward.
+
+Executed using existing ChatGPT/Codex subscription capacity. No incremental API charge. Subscription usage is still a consumed resource.
+
+See [spare-M1 handoff](spare-m1-newsroom.md) for exact setup and remaining on-device verification. No production discovery, approval, outbox, Gmail, Buffer, account or release behavior changed. Premium video remains the next creative milestone, not implemented here: Daniel's actual Gemini feedback, authentic footage and source basis, narration/audio rights, per-story editing, full-duration mobile playback and subtitle/audio QA must precede a release claim.

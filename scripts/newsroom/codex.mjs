@@ -1,6 +1,13 @@
-import { spawn } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
+const instructionsPath = fileURLToPath(
+  new URL("./instructions.md", import.meta.url),
+);
+const hash = (value) => createHash("sha256").update(value).digest("hex");
 export async function codexJSON({
   prompt,
   schema,
@@ -17,6 +24,18 @@ export async function codexJSON({
       .filter((k) => process.env[k])
       .map((k) => [k, process.env[k]]),
   );
+  const binary = process.env.NEWSROOM_CODEX_BIN || "codex";
+  // Recheck each invocation: changing the local login to an API key must not cause paid fallback.
+  try {
+    const login = await promisify(execFile)(binary, ["login", "status"], {
+      env,
+      timeout: 10000,
+    });
+    if (!/ChatGPT/i.test(login.stdout + login.stderr))
+      throw Error("Wrong auth mode");
+  } catch {
+    throw Error("CHATGPT_LOGIN_REQUIRED_NO_API_FALLBACK");
+  }
   // Login remains in the local official CLI store. No service keys or paid API fallback.
   const args = [
     "exec",
@@ -34,6 +53,18 @@ export async function codexJSON({
     "browser_use",
     "--disable",
     "computer_use",
+    "--disable",
+    "plugins",
+    "--disable",
+    "hooks",
+    "--disable",
+    "memories",
+    "-c",
+    `model_instructions_file=${JSON.stringify(instructionsPath)}`,
+    "-c",
+    "project_doc_max_bytes=0",
+    "-c",
+    "memories.use_memories=false",
     "-c",
     'web_search="disabled"',
     "-c",
@@ -55,14 +86,20 @@ export async function codexJSON({
   let stderr = "",
     buffer = "",
     tools = 0;
-  const child = spawn(process.env.NEWSROOM_CODEX_BIN || "codex", args, {
+  const child = spawn(binary, args, {
     env,
     stdio: ["pipe", "pipe", "pipe"],
     detached: true,
   });
+  let killTimer;
   const stop = () => {
     try {
       process.kill(-child.pid, "SIGTERM");
+      killTimer = setTimeout(() => {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch {}
+      }, 5000);
     } catch {}
   };
   process.once("SIGTERM", stop);
@@ -98,6 +135,7 @@ export async function codexJSON({
     child.once("close", resolve);
   }).finally(() => {
     clearTimeout(timer);
+    clearTimeout(killTimer);
     process.removeListener("SIGTERM", stop);
   });
   const usage = events
@@ -109,6 +147,26 @@ export async function codexJSON({
     code,
     usage,
     tool_events: tools,
+    agent_messages: events.filter(
+      (e) => e.type === "item.completed" && e.item?.type === "agent_message",
+    ).length,
+    visible_errors: events.filter(
+      (e) => e.type === "error" || e.type === "turn.failed",
+    ).length,
+    prompt_bytes: Buffer.byteLength(prompt),
+    prompt_sha256: hash(prompt),
+    schema_sha256: hash(JSON.stringify(schema)),
+    instructions_sha256: hash(await readFile(instructionsPath)),
+    image_inputs: await Promise.all(
+      images.map(async (file) => {
+        const bytes = await readFile(file);
+        return {
+          name: path.basename(file),
+          bytes: bytes.length,
+          sha256: hash(bytes),
+        };
+      }),
+    ),
     label:
       "Executed using existing ChatGPT/Codex subscription capacity. No incremental API charge. Subscription usage is still a consumed resource.",
   };

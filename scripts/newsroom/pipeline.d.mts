@@ -1,3 +1,10 @@
-export function safeSVG(svg:string):string;
-export function plain(html:string):string;
-export function produce(snapshot:unknown,directory:string):Promise<unknown>;
+export function safeSVG(svg: string): string;
+export function plain(html: string): string;
+export function produce(snapshot: unknown, directory: string): Promise<unknown>;
+export function visualQARequest(input: {
+  caption: string;
+  claims: unknown;
+  excerpt: string;
+  sourceURL: string;
+  assets: unknown;
+}): { schema: unknown; prompt: string };
