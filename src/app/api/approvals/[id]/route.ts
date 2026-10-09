@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { editor } from "@/server/auth";
+import { reviewActor } from "@/server/review-auth";
 import { sameOrigin } from "@/server/request";
 import { applicationRpc } from "@/ingestion/store";
 import { controlSnapshot } from "@/control/service";
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ id: string }> };
 export async function GET(_request: Request, context: Context) {
   try {
-    await editor();
+    await reviewActor((await context.params).id);
     const rpc = await applicationRpc(),
       row = await findReview(rpc, (await context.params).id);
     let current = true;
@@ -66,17 +66,29 @@ export async function POST(request: Request, context: Context) {
       { status: 403 },
     );
   try {
-    const actor = await editor(),
+    const authorization = await reviewActor((await context.params).id),
       rpc = await applicationRpc(),
       id = (await context.params).id;
     const text = await request.text();
     if (text.length > 10000) throw Error("REQUEST_TOO_LARGE");
-    const row = await decideCandidate(rpc, id, JSON.parse(text), actor);
-    // A durable outbox row is the success boundary. Cron owns all dispatch.
+    const row = await decideCandidate(
+      rpc,
+      id,
+      JSON.parse(text),
+      authorization.actor,
+      authorization.audit,
+    );
+    // Persist first. The existing hosted dispatcher is only a best-effort wake; cron recovers.
     const result =
       row.data.decision?.decision === "approve"
         ? await resumeCandidate(rpc, id)
         : { state: row.data.state, outbox_id: null };
+    if (result.outbox_id && !row.is_demo) {
+      await rpc("dispatch_brainos_automation", {
+        p_lane: "operations",
+        p_event: "manual",
+      }).catch(() => {});
+    }
     return NextResponse.json({
       saved: true,
       simulated: row.is_demo,

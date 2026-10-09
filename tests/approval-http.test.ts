@@ -2,11 +2,15 @@ import { afterEach, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   decide: vi.fn(),
   resume: vi.fn(),
+  rpc: vi.fn(async () => 1),
 }));
-vi.mock("@/server/auth", () => ({
-  editor: async () => "authenticated-editor",
+vi.mock("@/server/review-auth", () => ({
+  reviewActor: async () => ({
+    actor: "authenticated-editor",
+    audit: undefined,
+  }),
 }));
-vi.mock("@/ingestion/store", () => ({ applicationRpc: async () => vi.fn() }));
+vi.mock("@/ingestion/store", () => ({ applicationRpc: async () => h.rpc }));
 vi.mock("@/approval/service", () => ({
   decideCandidate: h.decide,
   resumeCandidate: h.resume,
@@ -61,6 +65,7 @@ it("live approval succeeds without Trigger and returns only after durable enqueu
     "candidate",
     expect.objectContaining({ decision: "approve" }),
     "authenticated-editor",
+    undefined,
   );
   expect(h.resume).toHaveBeenCalledWith(expect.any(Function), "candidate");
 });
@@ -90,4 +95,22 @@ it("enqueue interruption never returns false success", async () => {
   });
   expect(r.status).toBe(409);
   expect(await r.text()).not.toContain("connection-lost secret");
+});
+
+it("a failed hosted wake cannot erase durable approval/outbox", async () => {
+  h.decide.mockResolvedValue({
+    is_demo: false,
+    data: { decision: { decision: "approve" } },
+  });
+  h.resume.mockResolvedValue({ state: "QUEUED", outbox_id: "durable-outbox" });
+  h.rpc.mockRejectedValueOnce(Error("hosted wake unavailable"));
+  const r = await POST(request(), {
+    params: Promise.resolve({ id: "candidate" }),
+  });
+  expect(r.status).toBe(200);
+  expect((await r.json()).outbox_id).toBe("durable-outbox");
+  expect(h.rpc).toHaveBeenCalledWith("dispatch_brainos_automation", {
+    p_lane: "operations",
+    p_event: "manual",
+  });
 });

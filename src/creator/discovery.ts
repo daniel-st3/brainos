@@ -272,6 +272,10 @@ export async function runCreatorDiscovery(
     p_owner: owner,
     p_snapshot: snapshot,
   });
+  if (process.env.BRAINOS_AUTONOMOUS_STAGING === "true") {
+    const { queueNewsroomRun } = await import("../newsroom/queue");
+    await queueNewsroomRun(rpc, snapshot);
+  }
   return {
     status: "STORY_BRIEFS_ONLY",
     slot,

@@ -71,6 +71,16 @@ export function Shell({
     drawer.current?.close();
     setOpen(false);
   };
+  if (pathname.startsWith("/review-link/"))
+    return (
+      <main
+        id="main-content"
+        className="page"
+        style={{ maxWidth: 820, margin: "auto", padding: 24 }}
+      >
+        {children}
+      </main>
+    );
   if (pathname === "/login")
     return (
       <main id="main-content" tabIndex={-1} className="auth-shell">

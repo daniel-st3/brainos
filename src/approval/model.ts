@@ -59,6 +59,7 @@ export interface Candidate {
     actor: string;
     at: string;
     feedback: string;
+    authorization?: { method: "scoped_email_link"; grant_sha256: string };
     neo_risk_acknowledgment?: string;
     risk_acknowledgment?: {
       policy_id: string;

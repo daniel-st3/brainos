@@ -390,6 +390,7 @@ export async function decideCandidate(
   id: string,
   raw: unknown,
   actor: string,
+  authorization?: { method: "scoped_email_link"; grant_sha256: string },
 ) {
   const input = decisionInput.parse(raw),
     row = await findReview(rpc, id),
@@ -440,6 +441,7 @@ export async function decideCandidate(
             : "REQUEST_CHANGES",
       decision: {
         ...input,
+        ...(authorization ? { authorization } : {}),
         actor,
         at: now,
         ...(isNeoRisk(d.frozen.imported) && input.decision === "approve"

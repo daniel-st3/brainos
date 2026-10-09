@@ -1,3 +1,4 @@
+import { issueReviewLink } from "./review-link";
 import type { Rpc } from "../ingestion/store";
 import { readControl } from "../control/service";
 import type { Entity } from "../control/model";
@@ -21,7 +22,11 @@ export function reviewEmail(row: Review) {
   if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(email))
     throw Error("PERSONAL_EMAIL_REQUIRED");
   const { origin } = oauthConfiguration();
-  const body = `${row.is_demo ? "SIMULATION — no social publication\n" : ""}${row.data.frozen.title}\n\nReview:\n${origin}/review/${row.id}`;
+  const reviewPath =
+    process.env.BRAINOS_EMAIL_REVIEW_LINKS === "true"
+      ? `/review-link/${row.id}#${issueReviewLink(row)}`
+      : `/review/${row.id}`;
+  const body = `${row.is_demo ? "SIMULATION — no social publication\n" : ""}${row.data.frozen.title}\n\nReview:\n${origin}${reviewPath}`;
   return Buffer.from(
     [
       `From: ${email}`,

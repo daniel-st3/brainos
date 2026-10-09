@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
+  // Only these candidate endpoints accept scoped capabilities; handlers authorize every request.
+  if (
+    /^\/review-link\/[a-f0-9-]{36}$/.test(request.nextUrl.pathname) ||
+    /^\/api\/approvals\/[a-f0-9-]{36}(?:\/(?:access|media))?$/.test(
+      request.nextUrl.pathname,
+    )
+  )
+    return NextResponse.next();
   // Scheduler bearer is verified by this route; GET still requires editor().
   if (request.nextUrl.pathname === "/api/creator-discovery")
     return NextResponse.next();
@@ -26,9 +34,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   // This route uses a scoped worker credential, never a browser session.
   if (
-    ["/api/production/worker", "/api/automation"].includes(
-      request.nextUrl.pathname,
-    )
+    [
+      "/api/production/worker",
+      "/api/newsroom/worker",
+      "/api/automation",
+    ].includes(request.nextUrl.pathname)
   )
     return NextResponse.next();
   if (process.env.CONTENT_OS_MODE !== "supabase") {

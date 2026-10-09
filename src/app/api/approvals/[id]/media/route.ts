@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { editor } from "@/server/auth";
+import { reviewActor } from "@/server/review-auth";
 import { applicationRpc } from "@/ingestion/store";
 import type { ReviewMedia } from "@/approval/model";
 import { findReview } from "@/approval/service";
@@ -10,7 +10,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    await editor();
+    await reviewActor((await context.params).id);
     const row = await findReview(
       await applicationRpc(),
       (await context.params).id,
