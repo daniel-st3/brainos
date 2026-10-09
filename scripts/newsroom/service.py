@@ -41,6 +41,10 @@ def preflight(cfg):
         binary = pathlib.Path(cfg[key])
         if not binary.is_absolute() or not os.access(binary, os.X_OK):
             raise SystemExit("Missing absolute executable: " + key)
+    if cfg.get("ffmpeg"):
+        binary = pathlib.Path(cfg["ffmpeg"])
+        if not binary.is_absolute() or not os.access(binary, os.X_OK):
+            raise SystemExit("Missing absolute executable: ffmpeg")
     node = subprocess.run([cfg["node"], "--version"], capture_output=True, text=True, check=True)
     if int(node.stdout.strip().lstrip("v").split(".")[0]) < 24:
         raise SystemExit("Node 24 or newer required")
@@ -118,6 +122,8 @@ def main():
         cfg = json.loads((ROOT / "config.json").read_text())
         env = {k: v for k, v in os.environ.items() if k in ["HOME", "PATH", "TMPDIR", "LANG"]}
         env.update({"BRAINOS_ORIGIN": cfg["origin"], "PRODUCTION_WORKER_TOKEN": cfg["worker_token"], "NEWSROOM_CODEX_BIN": cfg["codex"], "NEWSROOM_WORK_DIR": str(ROOT / "jobs")})
+        if cfg.get("ffmpeg"):
+            env["FFMPEG_BIN"] = cfg["ffmpeg"]
         if cfg.get("bypass"):
             env["VERCEL_AUTOMATION_BYPASS_SECRET"] = cfg["bypass"]
         child = None

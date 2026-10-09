@@ -42,3 +42,41 @@ it("flags perceptually identical sources even with different encodings", async (
   const jpg = await sharp(png).jpeg().toBuffer();
   expect(await perceptualDuplicates([png, jpg])).toHaveLength(1);
 });
+it("keeps punch-in cuts inside the real source and refuses repeated/overlapping time ranges", () => {
+  const input = structuredClone(scenes);
+  const source = assets.map((a) => ({ ...a, width: 1616, height: 1080 }));
+  const shots = [
+    {
+      start: 0,
+      duration: 3,
+      crop: { x: 100, y: 100, width: 800, height: 600 },
+    },
+    {
+      start: 3,
+      duration: 3,
+      crop: { x: 100, y: 400, width: 800, height: 600 },
+    },
+  ];
+  Object.assign(input[1].video, { shots });
+  expect(() => validateScenes(input, source)).not.toThrow();
+  shots[1].start = 2;
+  expect(() => validateScenes(input, source)).toThrow("VIDEO_SHOT_BOUNDS");
+  shots[1].start = 3;
+  shots[1].crop.x = 1500;
+  expect(() => validateScenes(input, source)).toThrow("VIDEO_SHOT_BOUNDS");
+});
+it("rejects unsafe timed explanations and cues that outlive the source clip", () => {
+  const input = structuredClone(scenes);
+  const cue = {
+    start: 0,
+    end: 6,
+    svg: '<svg width="1080" height="1350"><text x="60" y="1100">Enviado</text></svg>',
+  };
+  Object.assign(input[1].video, { cues: [cue] });
+  expect(() => validateScenes(input, assets)).not.toThrow();
+  cue.end = 9;
+  expect(() => validateScenes(input, assets)).toThrow("VIDEO_CUE_BOUNDS");
+  cue.end = 6;
+  cue.svg = cue.svg.replace("</svg>", "<script>alert(1)</script></svg>");
+  expect(() => validateScenes(input, assets)).toThrow();
+});
