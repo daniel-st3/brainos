@@ -1,12 +1,16 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Rpc } from "../ingestion/store";
 import { readControl } from "../control/service";
 import type { CreatorSnapshot } from "../creator/discovery";
 export const runner = "newsroom-exec/v1";
 /** One explicit staging run at a time. No pilot mutation and no production quota. */
-export async function queueNewsroomRun(rpc: Rpc, snapshot: CreatorSnapshot) {
+export async function queueNewsroomRun(
+  rpc: Rpc,
+  snapshot: CreatorSnapshot,
+  mixedBrief?: Record<string, unknown>,
+) {
   const s = await readControl(rpc, true),
-    key = `${runner}/${snapshot.captured_at.slice(0, 13)}`;
+    key = `${runner}/${snapshot.captured_at.slice(0, 13)}${mixedBrief ? "/" + createHash("sha256").update(JSON.stringify(mixedBrief)).digest("hex").slice(0, 16) : ""}`;
   const prior = s.jobs.find((j) => j.idempotency_key === key);
   if (prior) return prior.id;
   if (
@@ -47,6 +51,7 @@ export async function queueNewsroomRun(rpc: Rpc, snapshot: CreatorSnapshot) {
         input: {
           runner,
           snapshot,
+          ...(mixedBrief ? { mixed_brief: mixedBrief } : {}),
           story_id: randomUUID(),
           content_id: randomUUID(),
           package_id: randomUUID(),

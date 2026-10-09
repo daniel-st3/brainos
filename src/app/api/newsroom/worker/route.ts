@@ -54,13 +54,13 @@ export async function POST(request: Request) {
     if (raw.action === "upload") {
       const name = z
           .string()
-          .regex(/^0[1-4]\.png$/)
+          .regex(/^0[1-6]\.(png|jpg|mp4)$/)
           .parse(raw.name),
         sha = z
           .string()
           .regex(/^[a-f0-9]{64}$/)
           .parse(raw.sha256);
-      z.number().int().positive().max(15000000).parse(raw.bytes);
+      z.number().int().positive().max(30000000).parse(raw.bytes);
       const file_id = `${job.input.package_id}/external/${sha}/${name}`,
         r = await storageClient()
           .storage.from("brainos-production")

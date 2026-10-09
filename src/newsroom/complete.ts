@@ -22,7 +22,7 @@ export async function completeNewsroom(rpc: Rpc, job: Job, raw: unknown) {
     const b = Buffer.from(await data.arrayBuffer());
     if (b.length !== m.bytes || hash(b) !== m.sha256)
       throw Error("FINAL_MEDIA_CHECKSUM");
-    files.push({ ...m, mime: "image/png" });
+    files.push({ ...m, mime: m.mime ?? "image/png" });
   }
   const archiveBytes = Buffer.from(JSON.stringify(r)),
     archive = {

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { produceMixed } from "./mixed.mjs";
 import { produce } from "./pipeline.mjs";
 import { closeFeedConnections } from "../../src/ingestion/fetch.ts";
 const origin = new URL(
@@ -62,7 +63,9 @@ try {
         }),
       60000,
     );
-    const result = await produce(job.input.snapshot, directory);
+    const result = await (job.input.mixed_brief
+      ? produceMixed(job.input.mixed_brief, directory)
+      : produce(job.input.snapshot, directory));
     if (leaseLost) throw Error("LEASE_LOST");
     for (const m of result.media) {
       const ticket = await api({ action: "upload", ...lease, ...m });
@@ -72,7 +75,7 @@ try {
       const bytes = await fs.readFile(path.join(directory, m.name));
       const r = await fetch(ticket.url, {
         method: "PUT",
-        headers: { "Content-Type": "image/png" },
+        headers: { "Content-Type": m.mime ?? "image/png" },
         body: bytes,
         signal: AbortSignal.timeout(120000),
       });

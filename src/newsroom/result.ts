@@ -34,16 +34,19 @@ export const newsroomResult = z
     media: z
       .array(
         z.object({
-          name: z.string().regex(/^0[1-4]\.png$/),
+          name: z.string().regex(/^0[1-6]\.(png|jpg|mp4)$/),
           sha256: hash,
-          bytes: z.number().int().positive().max(15000000),
+          bytes: z.number().int().positive().max(30000000),
           width: z.literal(1080),
           height: z.literal(1350),
           file_id: z.string(),
+          mime: z.enum(["image/png", "image/jpeg", "video/mp4"]).optional(),
+          duration: z.number().min(0).max(90).optional(),
+          source_id: hash.optional(),
         }),
       )
       .min(3)
-      .max(4),
+      .max(6),
     qa: z.object({
       pass: z.literal(true),
       findings: z.array(z.string()).max(30),
@@ -66,11 +69,31 @@ export function validateNewsroomResult(raw: unknown, packageId: string) {
   if (
     r.media.some(
       (m, i) =>
-        m.name !== `0${i + 1}.png` ||
+        !m.name.startsWith(`0${i + 1}.`) ||
         m.file_id !== `${packageId}/external/${m.sha256}/${m.name}`,
     )
   )
     throw Error("MEDIA_ORDER_OR_SCOPE");
+  for (const m of r.media) {
+    const expected = m.name.endsWith(".mp4")
+      ? "video/mp4"
+      : m.name.endsWith(".jpg")
+        ? "image/jpeg"
+        : "image/png";
+    if (
+      (m.mime ?? "image/png") !== expected ||
+      (expected === "video/mp4" && (!m.duration || m.duration < 3))
+    )
+      throw Error("MEDIA_TYPE_OR_DURATION");
+  }
+  if (
+    r.media.some(
+      (m) => m.source_id && !r.assets.some((a) => a.sha256 === m.source_id),
+    )
+  )
+    throw Error("MEDIA_SOURCE_BINDING");
+  const ids = r.media.map((m) => m.source_id).filter(Boolean);
+  if (new Set(ids).size !== ids.length) throw Error("REPEATED_SOURCE");
   if (
     Date.parse(r.source_retrieved_at) > Date.now() ||
     Date.now() - Date.parse(r.source_retrieved_at) > 3600000
